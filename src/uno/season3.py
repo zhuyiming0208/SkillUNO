@@ -1,0 +1,3 @@
+SEASON_ID     = "S3"
+SEASON_NAME   = "未同步"
+SKILL_CLASSES = []

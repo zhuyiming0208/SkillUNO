@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+
+# IDE
+.vscode/
+.idea/
+
+# 运行时数据
+src/uno/archive.txt
+src/uno/records/
+src/uno/presets.json
+
+# 系统
+.DS_Store
+Thumbs.db

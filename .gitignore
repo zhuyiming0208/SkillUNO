@@ -11,9 +11,6 @@ venv/
 .idea/
 
 # 运行时数据
-src/uno/archive.txt
-src/uno/records/
-src/uno/presets.json
 
 # 系统
 .DS_Store

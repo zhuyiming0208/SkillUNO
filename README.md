@@ -1,3 +1,5 @@
+![Python Tests](https://github.com/zhuyiming0208/SkillUNO/actions/workflows/test.yml/badge.svg)
+
 # SkillUNO
 
 一个基于 Python 的 UNO 卡牌游戏框架，支持 Mod 化技能、赛季、成就、回放与热座模式。

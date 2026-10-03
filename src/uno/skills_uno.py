@@ -31,7 +31,7 @@ class SkillLoader:
                 print(f"错误：无法导入赛季模块 {module_name} - {e}")
 
         # Mods
-        mods_dir = os.path.join(os.path.dirname(__file__), '...', 'mods')
+        mods_dir = os.path.join(os.path.dirname(__file__), '..', '..', 'mods')
         if os.path.exists(mods_dir):
             for filename in sorted(os.listdir(mods_dir)):
                 if filename.endswith('.py') and not filename.startswith('_'):

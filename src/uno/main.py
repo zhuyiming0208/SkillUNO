@@ -1,6 +1,5 @@
 import sys
 import os
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
 from uno.core import UNOGame
 from uno.archive import show_record
 from uno.replay import GameRecorder, GameReplayer
@@ -194,10 +193,16 @@ def replay():
     except Exception as e:
         ui.show(f"回放出错：{e}")
 
-if __name__ == "__main__":
+
+
+def cli():
     print(f"SkillUNO {VERSION}")
     action = input("1. 新游戏  2. 回放录像\n请选择: ").strip()
     if action == '2':
         replay()
     else:
         main()
+
+
+if __name__ == "__main__":
+    cli()

@@ -10,7 +10,7 @@ dependencies = [
 ]
 
 [project.scripts]
-skilluno = "uno.main:main"
+skilluno = "uno.main:cli"
 
 [build-system]
 requires = ["setuptools>=61"]

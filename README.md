@@ -7,10 +7,10 @@
 
 ## 游戏截图
 
-![游戏界面 1](docs/screenshots/gameplay1.jpg)
+![游戏界面 1](https://cdn.jsdelivr.net/gh/zhuyiming0208/SkillUNO@main/docs/screenshots/gameplay1.jpg)
 
 
-![游戏界面 2](docs/screenshots/gameplay2.jpg)
+![游戏界面 2](https://cdn.jsdelivr.net/gh/zhuyiming0208/SkillUNO@main/docs/screenshots/gameplay2.jpg)
 
 ## 特性
 

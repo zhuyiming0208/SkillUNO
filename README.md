@@ -3,7 +3,12 @@
 # SkillUNO
 
 一个基于 Python 的 UNO 卡牌游戏框架，支持 Mod 化技能、赛季、成就、回放与热座模式。
-(部分代码由AI辅助生成)
+(部分代码由 AI 辅助生成)
+
+## 游戏截图
+
+![游戏界面 1](docs/screenshots/gameplay1.jpg)
+![游戏界面 2](docs/screenshots/gameplay2.jpg)
 
 ## 特性
 
@@ -18,9 +23,15 @@
 
 \`\`\`bash
 git clone https://github.com/zhuyiming0208/SkillUNO.git
-cd skilluno
+cd SkillUNO
 pip install -e .
-python main.py
+skilluno
+\`\`\`
+
+如果不安装，也可以直接运行：
+
+\`\`\`bash
+PYTHONPATH=src python -m uno.main
 \`\`\`
 
 ## 文档

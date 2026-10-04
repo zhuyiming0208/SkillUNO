@@ -1,4 +1,4 @@
-import json
+﻿import json
 import os
 import glob
 from datetime import datetime
@@ -34,7 +34,6 @@ class GameRecorder:
             json.dump(data, f, ensure_ascii=False, indent=2)
         return filepath
 
-
 def list_records() -> List[str]:
     """返回所有录像文件的完整路径列表（按时间倒序）"""
     if not os.path.exists(RECORDS_DIR):
@@ -42,7 +41,6 @@ def list_records() -> List[str]:
     files = glob.glob(os.path.join(RECORDS_DIR, "replay_*.json"))
     files.sort(reverse=True)  # 最新的在前
     return files
-
 
 class GameReplayer:
     def __init__(self, filepath: str, ui):
@@ -54,39 +52,54 @@ class GameReplayer:
             content = f.read().strip()
             if not content:
                 raise ValueError("录像文件为空。")
-            self.data = json.loads(content)
+            try:
+                self.data = json.loads(content)
+            except json.JSONDecodeError as e:
+                raise ValueError(f"录像文件内容不是有效的 JSON：{e}")
         self.event_index = 0
 
     @classmethod
     def interactive_choose(cls, ui):
-        """让用户从列表中选择一个录像，返回 GameReplayer 实例"""
-        records = list_records()
-        if not records:
+        """让用户从列表中选择一个录像，返回 GameReplayer 实例。
+        打不开的录像会被自动过滤，不会出现在列表中。
+        """
+        all_records = list_records()
+        if not all_records:
             raise FileNotFoundError("没有找到任何录像文件。")
-        ui.show("可用的录像文件：")
-        for i, path in enumerate(records):
-            # 提取文件名和时间信息
-            fname = os.path.basename(path)
-            # 尝试读取玩家信息
+
+        # 预读每个录像，过滤掉损坏的文件
+        valid_records = []  # [(path, data), ...]
+        for path in all_records:
             try:
                 with open(path, 'r', encoding='utf-8') as f:
-                    data = json.load(f)
-                players = ', '.join(data.get('players', []))
-                ts = data.get('timestamp', fname)
-            except:
-                players = '未知'
-                ts = fname
+                    content = f.read().strip()
+                if not content:
+                    continue
+                data = json.loads(content)
+                valid_records.append((path, data))
+            except (json.JSONDecodeError, OSError, ValueError):
+                continue
+
+        if not valid_records:
+            raise FileNotFoundError("录像文件均不可读。")
+
+        ui.show("可用的录像文件：")
+        for i, (path, data) in enumerate(valid_records):
+            fname = os.path.basename(path)
+            players = ', '.join(data.get('players', [])) or '未知'
+            ts = data.get('timestamp', fname)
             ui.show(f"  {i}: {ts}  玩家: {players}")
+
         choice = ui.input("请输入序号（直接回车选择最新）: ").strip()
         if choice == '':
-            path = records[0]
+            path = valid_records[0][0]
         else:
             try:
                 idx = int(choice)
-                path = records[idx]
+                path = valid_records[idx][0]
             except (ValueError, IndexError):
                 ui.show("无效选择，使用最新录像。")
-                path = records[0]
+                path = valid_records[0][0]
         return cls(path, ui)
 
     def next_event(self):
@@ -129,3 +142,4 @@ class GameReplayer:
                 self.ui.show("回放结束。")
                 break
             input("按回车继续...")
+

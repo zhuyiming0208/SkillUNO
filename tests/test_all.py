@@ -1218,3 +1218,123 @@ class TestReplay:
         empty.write_text('', encoding='utf-8')
         with pytest.raises((FileNotFoundError, ValueError)):
             GameReplayer(str(empty), MagicMock())
+
+# ==================== Archive ====================
+class TestArchive:
+    @pytest.fixture(autouse=True)
+    def redirect_archive_file(self, tmp_path, monkeypatch):
+        """把 ARCHIVE_FILE 指向临时文件，避免污染真实数据。"""
+        import uno.archive as archive_module
+        fake_file = tmp_path / "archive.txt"
+        monkeypatch.setattr(archive_module, 'ARCHIVE_FILE', str(fake_file))
+        self.archive_module = archive_module
+        self.archive_file = fake_file
+
+    def test_load_missing_file_returns_empty(self):
+        assert self.archive_module.load_archive() == {}
+
+    def test_load_empty_file_returns_empty(self):
+        self.archive_file.write_text('', encoding='utf-8')
+        assert self.archive_module.load_archive() == {}
+
+    def test_load_invalid_base64_returns_empty(self):
+        self.archive_file.write_text('!!!not-base64!!!', encoding='ascii')
+        assert self.archive_module.load_archive() == {}
+
+    def test_load_invalid_json_returns_empty(self):
+        # 合法 Base64，但内容不是合法 JSON
+        content = base64.b64encode(b'not-json').decode('ascii')
+        self.archive_file.write_text(content, encoding='ascii')
+        assert self.archive_module.load_archive() == {}
+
+    def test_save_and_load_roundtrip(self):
+        data = {"你": {"wins": 3, "losses": 1, "achievements": ["一穿三"]}}
+        self.archive_module.save_archive(data)
+        loaded = self.archive_module.load_archive()
+        assert loaded == data
+
+    def test_save_is_base64_json(self):
+        data = {"你": {"wins": 1, "losses": 0, "achievements": []}}
+        self.archive_module.save_archive(data)
+        content = self.archive_file.read_text(encoding='ascii')
+        decoded = base64.b64decode(content).decode('utf-8')
+        parsed = json.loads(decoded)
+        assert parsed == data
+
+    def test_load_legacy_no_achievements_field(self):
+        """兼容旧存档：缺少 achievements 字段时自动补空列表。"""
+        legacy = {"老玩家": {"wins": 5, "losses": 3}}   # 没有 achievements
+        encoded = base64.b64encode(
+            json.dumps(legacy, ensure_ascii=False).encode('utf-8')
+        ).decode('ascii')
+        self.archive_file.write_text(encoded, encoding='ascii')
+        loaded = self.archive_module.load_archive()
+        assert loaded["老玩家"]["achievements"] == []
+
+    def test_update_record_win(self):
+        self.archive_module.update_record("A", True)
+        data = self.archive_module.load_archive()
+        assert data["A"]["wins"] == 1
+        assert data["A"]["losses"] == 0
+
+    def test_update_record_loss(self):
+        self.archive_module.update_record("A", False)
+        data = self.archive_module.load_archive()
+        assert data["A"]["wins"] == 0
+        assert data["A"]["losses"] == 1
+
+    def test_update_record_increments(self):
+        self.archive_module.update_record("A", True)
+        self.archive_module.update_record("A", True)
+        self.archive_module.update_record("A", False)
+        data = self.archive_module.load_archive()
+        assert data["A"]["wins"] == 2
+        assert data["A"]["losses"] == 1
+
+    def test_update_record_with_achievements(self):
+        self.archive_module.update_record("A", True, ["一穿三", "反制大师"])
+        data = self.archive_module.load_archive()
+        assert set(data["A"]["achievements"]) == {"一穿三", "反制大师"}
+
+    def test_update_record_merges_achievements(self):
+        self.archive_module.update_record("A", True, ["一穿三"])
+        self.archive_module.update_record("A", True, ["反制大师"])
+        data = self.archive_module.load_archive()
+        assert set(data["A"]["achievements"]) == {"一穿三", "反制大师"}
+
+    def test_update_record_deduplicates_achievements(self):
+        self.archive_module.update_record("A", True, ["一穿三"])
+        self.archive_module.update_record("A", True, ["一穿三"])
+        data = self.archive_module.load_archive()
+        assert data["A"]["achievements"].count("一穿三") == 1
+
+    def test_show_record_missing_player(self, capsys):
+        self.archive_module.show_record("查无此人")
+        out = capsys.readouterr().out
+        assert "尚无战绩记录" in out
+
+    def test_show_record_existing_player(self, capsys):
+        self.archive_module.update_record("A", True)
+        self.archive_module.update_record("A", False)
+        capsys.readouterr()   # 清掉 update_record 的输出
+        self.archive_module.show_record("A")
+        out = capsys.readouterr().out
+        assert "1胜" in out
+        assert "1负" in out
+        assert "50." in out
+
+    def test_show_record_with_achievements(self, capsys):
+        self.archive_module.update_record("A", True, ["一穿三"])
+        capsys.readouterr()
+        self.archive_module.show_record("A")
+        out = capsys.readouterr().out
+        assert "一穿三" in out
+
+    def test_multiple_players(self):
+        self.archive_module.update_record("A", True)
+        self.archive_module.update_record("B", False)
+        data = self.archive_module.load_archive()
+        assert "A" in data
+        assert "B" in data
+        assert data["A"]["wins"] == 1
+        assert data["B"]["losses"] == 1

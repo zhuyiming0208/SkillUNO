@@ -18,3 +18,10 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.coverage.run]
+omit = [
+    "src/uno/main.py",
+    "src/uno/ui.py",
+    "src/uno/season3.py",
+]

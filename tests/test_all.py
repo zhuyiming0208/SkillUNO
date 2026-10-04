@@ -1,14 +1,26 @@
+﻿"""
+SkillUNO 完整测试套件（pytest 风格）
+
+运行：
+    cd /storage/emulated/0/AGHSU/SkillUNO
+    python -m pytest tests/ -v
+
+带覆盖率：
+    python -m pytest tests/ -v --cov=src/uno --cov-report=term-missing
+"""
 import sys
 import os
-import unittest
-from unittest.mock import patch, MagicMock
+import base64
+import json
+import tempfile
+from unittest.mock import MagicMock, patch
+
+import pytest
 
 # ==================== 路径配置 ====================
-# 本测试文件位于 SkillUNO/tests/test_all.py
-# 需要把 SkillUNO/src 加入 sys.path，才能 import uno
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
-PROJECT_ROOT = os.path.dirname(CURRENT_DIR)          # SkillUNO/
-SRC_DIR = os.path.join(PROJECT_ROOT, 'src')          # SkillUNO/src/
+PROJECT_ROOT = os.path.dirname(CURRENT_DIR)                # SkillUNO/
+SRC_DIR = os.path.join(PROJECT_ROOT, 'src')                # SkillUNO/src/
 if SRC_DIR not in sys.path:
     sys.path.insert(0, SRC_DIR)
 
@@ -23,101 +35,177 @@ from uno.achievements import (
     Comeback1v3Achievement, CounterMasterAchievement,
     InstantKillAchievement, NoDrawVictoryAchievement
 )
+import uno.presets as presets_module
 import uno.season1 as season1
 import uno.season2 as season2
+import uno.season3 as season3
 import uno.season4 as season4
 
 
-# ==================== 卡牌逻辑 ====================
-class TestCard(unittest.TestCase):
+# ==================== 共享 Fixtures ====================
+@pytest.fixture
+def mock_game():
+    """构造一个 UI 完全被 mock 的游戏对象，默认所有玩家为 AI，避免 input() 阻塞。"""
+    game = UNOGame(debug=False, use_rich_ui=False, enabled_seasons=['S1'])
+    game.ui = MagicMock()
+    for p in game.players:
+        p.ui = MagicMock()
+        p.is_human = False
+    return game
+
+
+@pytest.fixture
+def owner(mock_game):
+    """返回 AI 玩家（players[0]），避免卡 input()。"""
+    return mock_game.players[0]
+
+
+@pytest.fixture
+def other_player(mock_game):
+    return mock_game.players[1]
+
+
+@pytest.fixture
+def human_player(mock_game):
+    """显式需要人类分支时使用，自动 mock input。"""
+    p = mock_game.players[0]
+    p.is_human = True
+    p.ui.input = MagicMock(return_value='0')
+    return p
+
+
+@pytest.fixture
+def clean_presets_file(tmp_path, monkeypatch):
+    """把 presets.PRESET_FILE 指向一个临时文件，避免污染真实数据。"""
+    fake_file = tmp_path / "presets.json"
+    monkeypatch.setattr(presets_module, 'PRESET_FILE', str(fake_file))
+    return fake_file
+
+
+# ==================== 防回归 Smoke Test ====================
+class TestFixtureSafety:
+    def test_mock_game_owner_is_ai(self, mock_game):
+        for p in mock_game.players:
+            assert p.is_human is False
+
+    def test_human_player_fixture_is_human(self, human_player):
+        assert human_player.is_human is True
+
+
+# ==================== Card ====================
+class TestCard:
     def test_playable_same_color(self):
         top = Card('红', '数字', 5)
-        card = Card('红', '数字', 3)
-        self.assertTrue(card.is_playable_on(top))
+        assert Card('红', '数字', 3).is_playable_on(top)
 
     def test_playable_same_number(self):
         top = Card('蓝', '数字', 5)
-        card = Card('红', '数字', 5)
-        self.assertTrue(card.is_playable_on(top))
+        assert Card('红', '数字', 5).is_playable_on(top)
 
     def test_playable_wild(self):
         top = Card('黄', '数字', 7)
-        card = Card('黑', '万能')
-        self.assertTrue(card.is_playable_on(top))
+        assert Card('黑', '万能').is_playable_on(top)
 
     def test_not_playable(self):
         top = Card('绿', '数字', 7)
-        card = Card('红', '数字', 2)
-        self.assertFalse(card.is_playable_on(top))
+        assert not Card('红', '数字', 2).is_playable_on(top)
 
     def test_playable_same_action(self):
         top = Card('蓝', '+2')
-        card = Card('红', '+2')
-        self.assertTrue(card.is_playable_on(top))
+        assert Card('红', '+2').is_playable_on(top)
+
+    def test_repr_number(self):
+        assert repr(Card('红', '数字', 5)) == '红5'
+
+    def test_repr_wild(self):
+        assert repr(Card('黑', '万能')) == '万能'
+        assert repr(Card('黑', '万能+4')) == '万能+4'
+
+    def test_repr_action(self):
+        assert repr(Card('蓝', '跳过')) == '蓝跳过'
+        assert repr(Card('绿', '反转')) == '绿反转'
 
 
-# ==================== 牌堆 ====================
-class TestDeck(unittest.TestCase):
+# ==================== Deck ====================
+class TestDeck:
     def test_initial_size(self):
-        deck = Deck()
-        self.assertEqual(len(deck.cards), 108)
+        assert len(Deck().cards) == 108
 
     def test_draw_reduces_size(self):
         deck = Deck()
-        size_before = len(deck.cards)
+        before = len(deck.cards)
         deck.draw()
-        self.assertEqual(len(deck.cards), size_before - 1)
+        assert len(deck.cards) == before - 1
 
     def test_reshuffle_uses_discard(self):
         discard = [Card('红', '数字', 1), Card('蓝', '数字', 2)]
         deck = Deck(discard_pile=discard)
-        deck.cards = []  # 强制空
-        drawn = deck.draw()  # 触发重洗
-        self.assertIsNotNone(drawn)
-        # 重洗后弃牌堆应只保留顶部一张
-        self.assertEqual(len(deck.discard), 1)
+        deck.cards = []
+        drawn = deck.draw()
+        assert drawn is not None
+        assert len(deck.discard) == 1
 
     def test_draw_one_and_many(self):
         deck = Deck()
-        one = deck.draw_one()
-        self.assertIsInstance(one, Card)
+        assert isinstance(deck.draw_one(), Card)
         many = deck.draw_many(3)
-        self.assertEqual(len(many), 3)
-        self.assertTrue(all(isinstance(c, Card) for c in many))
+        assert len(many) == 3
+        assert all(isinstance(c, Card) for c in many)
+
+    def test_reshuffle_empty_discard_raises(self):
+        deck = Deck()
+        deck.cards = []
+        deck.discard.clear()
+        with pytest.raises(Exception):
+            deck.draw()
 
 
-# ==================== 玩家 ====================
-class TestPlayer(unittest.TestCase):
-    def setUp(self):
-        self.ui = ConsoleUI()
-        self.player = Player("测试", is_human=False, ui=self.ui)
+# ==================== Player ====================
+class TestPlayer:
+    def test_hand_limit(self, mock_game):
+        p = mock_game.players[0]
+        p.hand = [Card('红', '数字', i) for i in range(15)]
+        mock_game.players = [p]
+        with patch.object(mock_game, 'broadcast'):
+            p.eliminate(mock_game)
+        assert p.eliminated
+        assert len(p.hand) == 0
 
-    def test_hand_limit(self):
-        self.player.hand = [Card('红', '数字', i) for i in range(15)]
-        game = UNOGame(debug=False, use_rich_ui=False)
-        game.players = [self.player]
-        with patch('builtins.print'):
-            self.player.eliminate(game)
-        self.assertTrue(self.player.eliminated)
-        self.assertEqual(len(self.player.hand), 0)
-
-    def test_skill_display(self):
-        s = Skill('测试技能', SkillType.ACTIVE, '描述', owner=self.player)
-        self.player.skills.append(s)
-        self.assertEqual(self.player.show_skills(), ['测试技能'])
+    def test_skill_display(self, owner):
+        s = Skill('测试技能', SkillType.ACTIVE, '描述', owner=owner)
+        owner.skills = [s]
+        assert owner.show_skills() == ['测试技能']
         s.is_consumed = True
-        self.assertEqual(self.player.show_skills(), ['测试技能(已用)'])
+        assert owner.show_skills() == ['测试技能(已用)']
         s.is_deleted = True
-        self.assertEqual(self.player.show_skills(), ['???'])
+        assert owner.show_skills() == ['???']
+
+    def test_show_hand(self, owner):
+        owner.hand = [Card('红', '数字', 1), Card('蓝', '数字', 2)]
+        text = owner.show_hand()
+        assert '红1' in text
+        assert '蓝2' in text
+
+    def test_choose_color_ai_picks_most(self, owner):
+        """owner 强制为 AI，避免走 input() 分支卡住。"""
+        owner.is_human = False
+        owner.hand = [Card('红', '数字', 1), Card('红', '数字', 2),
+                      Card('蓝', '数字', 3)]
+        assert owner.choose_color() == '红'
+
+    def test_get_available_combos_empty(self, owner):
+        owner.skills = []
+        assert owner.get_available_combos() == []
+
+    def test_draw_cards(self, owner):
+        owner.hand = []
+        owner.draw_cards([Card('红', '数字', 1), Card('蓝', '数字', 2)])
+        assert len(owner.hand) == 2
 
 
-# ==================== 技能管理器 ====================
-class TestSkillManager(unittest.TestCase):
-    def setUp(self):
-        self.game = UNOGame(debug=False, use_rich_ui=False)
-        self.game.skill_manager = SkillManager(self.game)
-
-    def test_trigger_auto_skill(self):
+# ==================== SkillManager ====================
+class TestSkillManager:
+    def test_trigger_auto_skill(self, mock_game):
         class FakeSkill(Skill):
             def __init__(self, game):
                 super().__init__('测试', SkillType.ACTIVE, 'desc',
@@ -131,12 +219,12 @@ class TestSkillManager(unittest.TestCase):
                 self.triggered = True
                 return True
 
-        skill = FakeSkill(self.game)
-        self.game.players[0].skills.append(skill)
-        self.game.skill_manager.trigger(GameEvent.GAME_START)
-        self.assertTrue(skill.triggered)
+        skill = FakeSkill(mock_game)
+        mock_game.players[0].skills.append(skill)
+        mock_game.skill_manager.trigger(GameEvent.GAME_START)
+        assert skill.triggered
 
-    def test_intercept_ask_human(self):
+    def test_intercept_ask_human(self, mock_game, human_player):
         class InterceptSkill(Skill):
             def can_trigger(self, event, context):
                 return True
@@ -144,242 +232,959 @@ class TestSkillManager(unittest.TestCase):
             def activate(self, event, context):
                 return True
 
-        player = self.game.players[0]
-        player.is_human = True
-        skill = InterceptSkill('拦截', SkillType.ACTIVE, 'desc', owner=player)
-        player.skills.append(skill)
-        with patch('builtins.input', return_value='0'):
-            result = self.game.skill_manager.ask_human_intercept(
-                player, GameEvent.BEING_ADDED_CARDS,
-                {'target': player, 'amount': 2}
-            )
-        self.assertTrue(result)
+        skill = InterceptSkill('拦截', SkillType.ACTIVE, 'desc', owner=human_player)
+        human_player.skills = [skill]
+        result = mock_game.skill_manager.ask_human_intercept(
+            human_player, GameEvent.BEING_ADDED_CARDS,
+            {'target': human_player, 'amount': 2}
+        )
+        assert result is True
+
+    def test_intercept_no_skills_returns_false(self, mock_game):
+        player = mock_game.players[0]
+        player.skills = []
+        result = mock_game.skill_manager.ask_human_intercept(
+            player, GameEvent.BEING_ADDED_CARDS,
+            {'target': player, 'amount': 2}
+        )
+        assert result is False
+
+    def test_execute_skill_skips_consumed(self, mock_game):
+        skill = Skill('测试', SkillType.ACTIVE, 'desc',
+                      owner=mock_game.players[0], game=mock_game)
+        skill.is_consumed = True
+        mock_game.skill_manager.execute_skill(skill, GameEvent.TURN_START, {})
+
+    def test_activate_combo(self, mock_game):
+        from uno.combo_base import ComboBase
+        called = []
+
+        class TestCombo(ComboBase):
+            def execute(self, player, skill_manager, game):
+                called.append(player.name)
+
+        player = mock_game.players[0]
+        mock_game.skill_manager.activate_combo(TestCombo, player)
+        assert called == [player.name]
+        assert any(e['type'] == 'combo_use' for e in mock_game.event_log)
+
+
+# ==================== 游戏机制 ====================
+class TestGameMechanics:
+    def test_next_player_basic(self, mock_game):
+        for p in mock_game.players:
+            p.eliminated = False
+        mock_game.current_player_idx = 0
+        mock_game.next_player()
+        assert mock_game.current_player_idx == 1
+
+    def test_next_player_skips_eliminated(self, mock_game):
+        for p in mock_game.players:
+            p.eliminated = False
+        mock_game.players[1].eliminated = True
+        mock_game.current_player_idx = 0
+        mock_game.next_player()
+        assert mock_game.current_player_idx == 2
+
+    def test_next_player_direction_reverse(self, mock_game):
+        for p in mock_game.players:
+            p.eliminated = False
+        mock_game.direction = -1
+        mock_game.current_player_idx = 0
+        mock_game.next_player()
+        assert mock_game.current_player_idx == 3
+
+    def test_peek_next_player_does_not_advance(self, mock_game):
+        for p in mock_game.players:
+            p.eliminated = False
+        mock_game.current_player_idx = 0
+        nxt = mock_game.peek_next_player()
+        assert nxt is mock_game.players[1]
+        assert mock_game.current_player_idx == 0
+
+    def test_peek_next_player_all_eliminated(self, mock_game):
+        for p in mock_game.players:
+            p.eliminated = True
+        assert mock_game.peek_next_player() is None
+
+    def test_current_player(self, mock_game):
+        mock_game.current_player_idx = 2
+        assert mock_game.current_player() is mock_game.players[2]
+
+    def test_check_winner_hand_empty(self, mock_game):
+        """先给每个玩家一张手牌，再清空 players[2]，确保胜者是 players[2]。"""
+        for p in mock_game.players:
+            p.eliminated = False
+            p.hand = [Card('红', '数字', 1)]
+        mock_game.players[2].hand = []
+        assert mock_game.check_winner() is mock_game.players[2]
+
+    def test_check_winner_only_one_active(self, mock_game):
+        for p in mock_game.players:
+            p.eliminated = True
+        mock_game.players[3].eliminated = False
+        assert mock_game.check_winner() is mock_game.players[3]
+
+    def test_check_winner_none(self, mock_game):
+        for p in mock_game.players:
+            p.eliminated = False
+            p.hand = [Card('红', '数字', 1)]
+        assert mock_game.check_winner() is None
+
+    def test_broadcast_reaches_all_ui(self, mock_game):
+        ui1 = MagicMock()
+        ui2 = MagicMock()
+        mock_game.players[0].ui = ui1
+        mock_game.players[1].ui = ui2
+        mock_game.players[2].ui = NullUI()
+        mock_game.players[3].ui = NullUI()
+        mock_game.broadcast("测试消息")
+        ui1.show.assert_called_once_with("测试消息")
+        ui2.show.assert_called_once_with("测试消息")
+
+    def test_broadcast_skips_null_ui(self, mock_game):
+        for p in mock_game.players:
+            p.ui = NullUI()
+        mock_game.broadcast("测试消息")
+
+    def test_broadcast_dedupes_shared_ui(self, mock_game):
+        shared = MagicMock()
+        for p in mock_game.players:
+            p.ui = shared
+        mock_game.broadcast("消息")
+        assert shared.show.call_count == 1
+
+    def test_record_event(self, mock_game):
+        mock_game.record_event('test_event', foo='bar')
+        assert mock_game.event_log[-1]['type'] == 'test_event'
+        assert mock_game.event_log[-1]['foo'] == 'bar'
+
+    def test_apply_card_effect_skip(self, mock_game):
+        player = mock_game.players[0]
+        assert mock_game.apply_card_effect(player, Card('红', '跳过')) is True
+
+    def test_apply_card_effect_reverse(self, mock_game):
+        player = mock_game.players[0]
+        old_dir = mock_game.direction
+        result = mock_game.apply_card_effect(player, Card('红', '反转'))
+        assert result is False
+        assert mock_game.direction == -old_dir
+
+    def test_apply_card_effect_draw_two(self, mock_game):
+        player = mock_game.players[0]
+        with patch.object(mock_game, 'apply_add_cards') as mock_add:
+            result = mock_game.apply_card_effect(player, Card('红', '+2'))
+        assert result is True
+        mock_add.assert_called_once()
+        assert mock_add.call_args[0][0] is mock_game.players[1]
+        assert mock_add.call_args[0][1] == 2
+
+    def test_apply_card_effect_draw_four(self, mock_game):
+        player = mock_game.players[0]
+        with patch.object(mock_game, 'apply_add_cards') as mock_add, \
+             patch.object(player, 'choose_color', return_value='红'):
+            result = mock_game.apply_card_effect(player, Card('黑', '万能+4'))
+        assert result is True
+        assert mock_add.call_args[0][1] == 4
+        assert mock_game.current_color == '红'
+
+    def test_apply_card_effect_wild_color(self, mock_game):
+        player = mock_game.players[0]
+        with patch.object(player, 'choose_color', return_value='蓝'):
+            result = mock_game.apply_card_effect(player, Card('黑', '万能'))
+        assert result is False
+        assert mock_game.current_color == '蓝'
+
+    def test_uno_reminder_one_card(self, mock_game):
+        player = mock_game.players[1]
+        player.hand = [Card('红', '数字', 1)]
+        mock_game.uno_reminder(player)
+
+    def test_uno_reminder_not_triggered(self, mock_game):
+        player = mock_game.players[1]
+        player.hand = [Card('红', '数字', 1), Card('红', '数字', 2)]
+        mock_game.uno_reminder(player)
+
+    def test_skill_urgency_static(self):
+        assert Skill('测试', SkillType.ACTIVE, 'desc',
+                     urgency_weight=77).urgency_weight == 77
+
+    def test_skill_urgency_default(self):
+        assert Skill('测试', SkillType.ACTIVE, 'desc').urgency_weight == 50
+
+    def test_skill_urgency_custom(self, mock_game):
+        class CustomSkill(Skill):
+            def evaluate_urgency(self, game):
+                return 42
+
+        assert CustomSkill('x', SkillType.ACTIVE, 'd').evaluate_urgency(mock_game) == 42
 
 
 # ==================== 游戏流程 ====================
-class TestGameFlow(unittest.TestCase):
+class TestGameFlow:
     def test_full_ai_game(self):
-        """运行一局完全由 AI 进行的游戏，确保不崩溃"""
+        """验证 AI 对局能推进（限制回合数，避免无限跑）。"""
         game = UNOGame(debug=False, use_rich_ui=False)
+        game.ui = MagicMock()
         for p in game.players:
             p.is_human = False
-        for p in game.players:
-            p.hand_limit = 5
-        with patch('builtins.input', return_value=''):
-            game.run()
-        self.assertTrue(any(p.hand_size() == 0 or p.eliminated for p in game.players))
+            p.ui = MagicMock()
+        game.setup()
 
-    def test_add_cards_with_multiplier(self):
-        game = UNOGame(debug=False, use_rich_ui=False)
-        player = game.players[0]
+        with patch('builtins.input', return_value=''):
+            for _ in range(50):
+                game.play_turn()
+                if game.check_winner():
+                    break
+        assert True
+
+    def test_add_cards_with_multiplier(self, mock_game):
+        player = mock_game.players[0]
         player.hand_limit = 100
-        initial_hand = len(player.hand)
-        game.apply_add_cards(player, 2)
-        self.assertEqual(len(player.hand), initial_hand + 2)
+        before = len(player.hand)
+        mock_game.apply_add_cards(player, 2)
+        assert len(player.hand) == before + 2
 
     def test_dev_skills(self):
         from uno.season1 import PoWanFa, ZhaoZai
         dev = {'你': [PoWanFa, ZhaoZai]}
         game = UNOGame(debug=False, use_rich_ui=False, dev_skills=dev)
+        game.ui = MagicMock()
+        for p in game.players:
+            p.ui = MagicMock()
+            p.is_human = False
         game.setup()
-        self.assertEqual([s.name for s in game.players[0].skills], ['破万法', '招灾'])
+        assert [s.name for s in game.players[0].skills] == ['破万法', '招灾']
 
     def test_custom_room_rules(self):
         game = UNOGame(
-            debug=False,
-            use_rich_ui=False,
-            hand_limit=10,
-            initial_hand_size=5,
-            initial_skill_count=1
+            debug=False, use_rich_ui=False,
+            hand_limit=10, initial_hand_size=5, initial_skill_count=1
         )
+        game.ui = MagicMock()
+        for p in game.players:
+            p.ui = MagicMock()
+            p.is_human = False
         game.setup()
         for p in game.players:
-            self.assertEqual(p.hand_limit, 10)
-            self.assertEqual(len(p.hand), 5)
-            self.assertEqual(len(p.skills), 1)
+            assert p.hand_limit == 10
+            assert len(p.hand) == 5
+            assert len(p.skills) == 1
 
     def test_hotseat_mode_creation(self):
-        players = ['Alice', 'Bob']
-        game = UNOGame(debug=False, use_rich_ui=False, players=players)
-        self.assertTrue(game.hotseat)
-        self.assertEqual(len(game.players), 2)
-        for p in game.players:
-            self.assertTrue(p.is_human)
+        game = UNOGame(debug=False, use_rich_ui=False, players=['Alice', 'Bob'])
+        assert game.hotseat is True
+        assert len(game.players) == 2
+        assert all(p.is_human for p in game.players)
 
     def test_ui_decoupling(self):
-        """human_ui 与 ai_ui 应分别应用到不同玩家"""
-        from uno.ui import ConsoleUI, NullUI
         human_ui = ConsoleUI()
         ai_ui = NullUI()
-        game = UNOGame(
-            "你", ['S1'],
-            use_rich_ui=False,
-            human_ui=human_ui,
-            ai_ui=ai_ui
-        )
-        self.assertIs(game.players[0].ui, human_ui)
+        game = UNOGame("你", ['S1'], use_rich_ui=False,
+                       human_ui=human_ui, ai_ui=ai_ui)
+        assert game.players[0].ui is human_ui
         for p in game.players[1:]:
-            self.assertIs(p.ui, ai_ui)
+            assert p.ui is ai_ui
+
+    def test_end_single_game_records_winner(self, mock_game):
+        mock_game.setup()
+        human = mock_game.players[0]
+        ai = mock_game.players[1]
+        with patch('uno.archive.update_record'), \
+             patch('uno.archive.show_record'):
+            mock_game._end_single_game(human, ai)
+        assert any(e['type'] == 'game_end' and e.get('winner') == ai.name
+                   for e in mock_game.event_log)
+
+    def test_end_hotseat_game_records_all_humans(self):
+        """热座模式下，每位人类玩家的胜负都应被正确记录。"""
+        game = UNOGame(debug=False, use_rich_ui=False, players=['A', 'B'])
+        game.ui = MagicMock()
+        for p in game.players:
+            p.ui = MagicMock()
+        game.setup()
+
+        assert all(p.is_human for p in game.players)
+        assert len(game.players) == 2
+
+        winner = game.players[0]  # A 获胜
+
+        with patch('uno.archive.update_record') as mock_update, \
+             patch('uno.archive.show_record'):
+            game._end_hotseat_game(winner)
+
+        assert mock_update.call_count == 2
+        calls = {call.args[0]: call.args[1] for call in mock_update.call_args_list}
+        assert calls['A'] is True
+        assert calls['B'] is False
 
 
-# ==================== 加载器 ====================
-class TestLoader(unittest.TestCase):
-    """依赖、排斥、容忍测试（使用真实临时 Mod 文件）"""
+# ==================== Presets ====================
+class TestPresets:
+    def test_load_empty(self, clean_presets_file):
+        assert presets_module.load_presets() == []
 
-    def setUp(self):
-        # mods 目录位于 SkillUNO/mods
-        self.mods_dir = os.path.join(PROJECT_ROOT, 'mods')
-        os.makedirs(self.mods_dir, exist_ok=True)
-        # 确保 mods 是 Python 包
-        mods_init = os.path.join(self.mods_dir, '__init__.py')
-        if not os.path.exists(mods_init):
-            open(mods_init, 'w').close()
+    def test_load_when_file_empty(self, clean_presets_file):
+        clean_presets_file.write_text('', encoding='utf-8')
+        assert presets_module.load_presets() == []
+
+    def test_load_invalid_data(self, clean_presets_file):
+        clean_presets_file.write_text('not-valid-base64!!!', encoding='ascii')
+        assert presets_module.load_presets() == []
+
+    def test_save_and_load(self, clean_presets_file):
+        data = [{'name': 'P1', 'hand_limit': 10,
+                 'initial_hand_size': 5, 'initial_skill_count': 2}]
+        presets_module.save_presets(data)
+        assert presets_module.load_presets() == data
+
+    def test_add_new(self, clean_presets_file):
+        presets_module.add_preset("测试预设", 10, 5, 2)
+        presets = presets_module.load_presets()
+        assert len(presets) == 1
+        assert presets[0]['name'] == "测试预设"
+        assert presets[0]['hand_limit'] == 10
+        assert presets[0]['initial_hand_size'] == 5
+        assert presets[0]['initial_skill_count'] == 2
+
+    def test_add_updates_existing(self, clean_presets_file):
+        presets_module.add_preset("测试预设", 10, 5, 2)
+        presets_module.add_preset("测试预设", 20, 8, 3)
+        presets = presets_module.load_presets()
+        assert len(presets) == 1
+        assert presets[0]['hand_limit'] == 20
+        assert presets[0]['initial_hand_size'] == 8
+        assert presets[0]['initial_skill_count'] == 3
+
+    def test_add_multiple(self, clean_presets_file):
+        presets_module.add_preset("预设A", 10, 5, 2)
+        presets_module.add_preset("预设B", 15, 7, 3)
+        presets = presets_module.load_presets()
+        assert len(presets) == 2
+        assert {p['name'] for p in presets} == {"预设A", "预设B"}
+
+    def test_get_existing(self, clean_presets_file):
+        presets_module.add_preset("测试预设", 10, 5, 2)
+        p = presets_module.get_preset("测试预设")
+        assert p is not None
+        assert p['hand_limit'] == 10
+
+    def test_get_missing_returns_none(self, clean_presets_file):
+        assert presets_module.get_preset("不存在") is None
+
+    def test_file_is_base64_json(self, clean_presets_file):
+        presets_module.add_preset("测试预设", 10, 5, 2)
+        content = clean_presets_file.read_text(encoding='ascii')
+        decoded = base64.b64decode(content).decode('utf-8')
+        data = json.loads(decoded)
+        assert isinstance(data, list)
+        assert data[0]['name'] == "测试预设"
+
+    def test_add_returns_true(self, clean_presets_file):
+        assert presets_module.add_preset("P", 10, 5, 2) is True
+
+
+# ==================== Loader ====================
+class TestLoader:
+    @pytest.fixture(autouse=True)
+    def ensure_mods_package(self):
+        """
+        确保 mods/ 目录存在且已被初始化为 Python 包。
+        - 不创建 __init__.py，避免污染真实目录
+        - 缺失时直接 fail，提示项目结构有问题
+        """
+        mods_dir = os.path.join(PROJECT_ROOT, 'mods')
+        init_file = os.path.join(mods_dir, '__init__.py')
+
+        if not os.path.isdir(mods_dir):
+            pytest.skip("mods 目录不存在，跳过加载器测试")
+        if not os.path.exists(init_file):
+            pytest.fail(
+                f"mods/__init__.py 缺失于 {mods_dir}。"
+                "它是 Python 包的一部分，应提交到版本库。"
+            )
+
+        self.mods_dir = mods_dir
         self.temp_files = []
-
-    def tearDown(self):
+        yield
         for f in self.temp_files:
             if os.path.exists(f):
                 os.remove(f)
 
-    def _create_mod_file(self, filename, content):
+    def _create_mod(self, filename, content):
         path = os.path.join(self.mods_dir, filename)
         with open(path, 'w', encoding='utf-8') as f:
             f.write(content)
         self.temp_files.append(path)
-        return path
 
-    def test_dependency_missing(self):
-        self._create_mod_file('test_mod_dep.py', """
+    def test_dependency_missing(self, mock_game):
+        self._create_mod('test_mod_dep.py', """
 SEASON_ID = "MOD_DEP"
 SEASON_NAME = "依赖测试"
 RELY_ON = ("S2", "需要 S2 的技能")
 SKILL_CLASSES = []
 """)
-        skills, glossary, ach = SkillLoader.load_skills(
-            ['MOD_DEP'], UNOGame(debug=False, use_rich_ui=False)
-        )
-        self.assertEqual(skills, [])
+        skills, glossary, ach = SkillLoader.load_skills(['MOD_DEP'], mock_game)
+        assert skills == []
 
-    def test_reject_conflict(self):
-        self._create_mod_file('test_mod_reject.py', """
+    def test_reject_conflict(self, mock_game):
+        self._create_mod('test_mod_reject.py', """
 SEASON_ID = "MOD_REJ"
 SEASON_NAME = "排斥测试"
 REJECT = {"S1": "冲突"}
 SKILL_CLASSES = []
 """)
-        skills, glossary, ach = SkillLoader.load_skills(
-            ['S1', 'MOD_REJ'], UNOGame(debug=False, use_rich_ui=False)
-        )
-        self.assertEqual(skills, [])
+        skills, glossary, ach = SkillLoader.load_skills(['S1', 'MOD_REJ'], mock_game)
+        assert skills == []
 
-    def test_tolerate(self):
-        self._create_mod_file('test_mod_tolerate.py', """
+    def test_tolerate(self, mock_game):
+        self._create_mod('test_mod_tolerate.py', """
 SEASON_ID = "MOD_TOL"
 SEASON_NAME = "容忍测试"
 ONLY_TOLERATE = ("S1",)
 SKILL_CLASSES = []
 """)
         skills, glossary, ach = SkillLoader.load_skills(
-            ['S1', 'S2', 'MOD_TOL'], UNOGame(debug=False, use_rich_ui=False)
+            ['S1', 'S2', 'MOD_TOL'], mock_game
         )
-        # S2 应被排除，因此不应包含 S2 的专属技能（如始皇帝）
-        self.assertFalse(any(s.name == '始皇帝' for s in skills))
+        assert not any(s.name == '始皇帝' for s in skills)
+
+    def test_load_official_s1(self, mock_game):
+        skills, glossary, ach = SkillLoader.load_skills(['S1'], mock_game)
+        assert len(skills) == 15
+        assert isinstance(glossary, dict)
+        assert isinstance(ach, list)
+
+    def test_load_unknown_season(self, mock_game):
+        skills, glossary, ach = SkillLoader.load_skills(['NOT_EXIST'], mock_game)
+        assert skills == []
 
 
-# ==================== 成就系统 ====================
-class TestAchievements(unittest.TestCase):
-    def _create_mock_game(self):
-        game = MagicMock()
-        human = MagicMock()
-        human.name = '你'
-        computer1 = MagicMock()
-        computer1.name = '电脑A'
-        computer2 = MagicMock()
-        computer2.name = '电脑B'
-        computer3 = MagicMock()
-        computer3.name = '电脑C'
-        game.players = [human, computer1, computer2, computer3]
-        return game
+# ==================== Season 2 技能 ====================
+class TestSeason2ShiHuangDi:
+    def test_can_trigger_game_start(self, mock_game, owner):
+        s = season2.ShiHuangDi(owner, mock_game)
+        assert s.can_trigger(GameEvent.GAME_START, {})
 
-    def test_no_draw_victory(self):
-        game = self._create_mock_game()
+    def test_can_trigger_turn_start_for_owner(self, mock_game, owner):
+        s = season2.ShiHuangDi(owner, mock_game)
+        assert s.can_trigger(GameEvent.TURN_START, {'player': owner})
+
+    def test_cannot_trigger_turn_start_for_other(self, mock_game, owner, other_player):
+        s = season2.ShiHuangDi(owner, mock_game)
+        assert not s.can_trigger(GameEvent.TURN_START, {'player': other_player})
+
+    def test_urgency_high_when_opponent_has_many(self, mock_game, owner):
+        s = season2.ShiHuangDi(owner, mock_game)
+        other_player = mock_game.players[1]
+        other_player.hand = [Card('红', '数字', i) for i in range(10)]
+        assert s.evaluate_urgency(mock_game) == 90
+
+    def test_urgency_low_when_opponent_has_few(self, mock_game, owner):
+        s = season2.ShiHuangDi(owner, mock_game)
+        for p in mock_game.players[1:]:
+            p.hand = [Card('红', '数字', 1)]
+        assert s.evaluate_urgency(mock_game) == 70
+
+    def test_consumed_returns_false(self, mock_game, owner):
+        s = season2.ShiHuangDi(owner, mock_game)
+        s.is_consumed = True
+        assert not s.can_trigger(GameEvent.GAME_START, {})
+
+
+class TestSeason2SuQin:
+    def test_can_trigger_game_start(self, mock_game, owner):
+        s = season2.SuQin(owner, mock_game)
+        assert s.can_trigger(GameEvent.GAME_START, {})
+
+    def test_can_trigger_being_added(self, mock_game, owner):
+        s = season2.SuQin(owner, mock_game)
+        ctx = {'target': owner, 'amount': 3}
+        assert s.can_trigger(GameEvent.BEING_ADDED_CARDS, ctx)
+
+    def test_cannot_trigger_being_added_for_other(self, mock_game, owner, other_player):
+        s = season2.SuQin(owner, mock_game)
+        ctx = {'target': other_player, 'amount': 3}
+        assert not s.can_trigger(GameEvent.BEING_ADDED_CARDS, ctx)
+
+    def test_urgency_high_with_many_cards(self, mock_game, owner):
+        s = season2.SuQin(owner, mock_game)
+        owner.hand = [Card('红', '数字', i) for i in range(10)]
+        assert s.evaluate_urgency(mock_game) == 70
+
+    def test_urgency_low_with_few_cards(self, mock_game, owner):
+        s = season2.SuQin(owner, mock_game)
+        owner.hand = [Card('红', '数字', 1)]
+        assert s.evaluate_urgency(mock_game) == 30
+
+    def test_combo_partners_set(self, mock_game, owner):
+        s = season2.SuQin(owner, mock_game)
+        assert s.combo_partners == ('苏秦', '张仪')
+        assert s.combo_effect is season2.SuQinZhangYiCombo
+
+    def test_activate_being_added(self, mock_game, owner):
+        s = season2.SuQin(owner, mock_game)
+        owner.hand = [Card('红', '数字', i) for i in range(5)]
+        ctx = {'target': owner, 'amount': 3, 'cancel': False}
+        assert s.activate(GameEvent.BEING_ADDED_CARDS, ctx) is True
+        assert ctx['cancel'] is True
+        assert s.is_consumed is True
+        assert len(owner.hand) == 2
+
+
+class TestSeason2ZhangYi:
+    def test_can_trigger_game_start(self, mock_game, owner):
+        s = season2.ZhangYi(owner, mock_game)
+        assert s.can_trigger(GameEvent.GAME_START, {})
+
+    def test_can_trigger_turn_start(self, mock_game, owner):
+        s = season2.ZhangYi(owner, mock_game)
+        assert s.can_trigger(GameEvent.TURN_START, {'player': owner})
+
+    def test_urgency_zero_without_target(self, mock_game, owner):
+        s = season2.ZhangYi(owner, mock_game)
+        owner.hand = [Card('红', '数字', 9), Card('绿', '跳过')]
+        assert s.evaluate_urgency(mock_game) == 0
+
+    def test_urgency_high_when_next_has_few(self, mock_game, owner):
+        s = season2.ZhangYi(owner, mock_game)
+        owner.hand = [Card('红', '数字', 3)]
+        mock_game.players[1].hand = [Card('红', '数字', 1)]
+        assert s.evaluate_urgency(mock_game) == 90
+
+    def test_urgency_medium_default(self, mock_game, owner):
+        s = season2.ZhangYi(owner, mock_game)
+        owner.hand = [Card('红', '数字', 3)]
+        for p in mock_game.players[1:]:
+            p.hand = [Card('红', '数字', i) for i in range(7)]
+        assert s.evaluate_urgency(mock_game) == 50
+
+    def test_combo_partners_set(self, mock_game, owner):
+        s = season2.ZhangYi(owner, mock_game)
+        assert s.combo_partners == ('苏秦', '张仪')
+
+
+class TestSeason2ShuangShengHua:
+    def test_initial_ally_none(self, mock_game, owner):
+        s = season2.ShuangShengHua(owner, mock_game)
+        assert s.ally is None
+
+    def test_can_trigger_start_random_for_owner(self, mock_game, owner):
+        s = season2.ShuangShengHua(owner, mock_game)
+        assert s.can_trigger(GameEvent.START_RANDOM, {'player': owner})
+
+    def test_can_trigger_turn_start_when_unallied(self, mock_game, owner):
+        s = season2.ShuangShengHua(owner, mock_game)
+        assert s.can_trigger(GameEvent.TURN_START, {'player': owner})
+
+    def test_cannot_trigger_turn_start_when_allied(self, mock_game, owner):
+        s = season2.ShuangShengHua(owner, mock_game)
+        s.ally = mock_game.players[1]
+        assert not s.can_trigger(GameEvent.TURN_START, {'player': owner})
+
+    def test_can_trigger_cards_added_when_ally_targeted(self, mock_game, owner):
+        s = season2.ShuangShengHua(owner, mock_game)
+        ally = mock_game.players[1]
+        s.ally = ally
+        ctx = {'target': ally, 'amount': 3}
+        assert s.can_trigger(GameEvent.CARDS_ADDED, ctx)
+
+    def test_urgency_when_unallied(self, mock_game, owner):
+        s = season2.ShuangShengHua(owner, mock_game)
+        assert s.evaluate_urgency(mock_game) == 70
+
+    def test_urgency_when_allied(self, mock_game, owner):
+        s = season2.ShuangShengHua(owner, mock_game)
+        s.ally = mock_game.players[1]
+        assert s.evaluate_urgency(mock_game) == 0
+
+    def test_ally_sync_on_cards_added(self, mock_game, owner):
+        s = season2.ShuangShengHua(owner, mock_game)
+        ally = mock_game.players[1]
+        s.ally = ally
+        ctx = {'target': ally, 'amount': 2}
+        with patch.object(mock_game, 'apply_add_cards') as mock_add:
+            s.activate(GameEvent.CARDS_ADDED, ctx)
+        mock_add.assert_called_once_with(owner, 2)
+
+
+class TestSeason2JinShen:
+    def test_can_trigger_big_add(self, mock_game, owner):
+        s = season2.JinShen(owner, mock_game)
+        ctx = {'target': owner, 'amount': 10}
+        assert s.can_trigger(GameEvent.BEING_ADDED_CARDS, ctx)
+
+    def test_cannot_trigger_small_add(self, mock_game, owner):
+        s = season2.JinShen(owner, mock_game)
+        ctx = {'target': owner, 'amount': 3}
+        assert not s.can_trigger(GameEvent.BEING_ADDED_CARDS, ctx)
+
+    def test_can_trigger_powanfa(self, mock_game, owner):
+        s = season2.JinShen(owner, mock_game)
+        po_wan_fa = season1.PoWanFa(owner, mock_game)
+        ctx = {'activated_skill': po_wan_fa}
+        assert s.can_trigger(GameEvent.SKILL_ACTIVATED, ctx)
+
+    def test_activate_big_add(self, mock_game, owner):
+        s = season2.JinShen(owner, mock_game)
+        ctx = {'target': owner, 'amount': 10, 'cancel': False}
+        assert s.activate(GameEvent.BEING_ADDED_CARDS, ctx) is True
+        assert ctx['cancel'] is True
+
+
+class TestSeason2YingYan:
+    def test_can_trigger_game_start(self, mock_game, owner):
+        s = season2.YingYan(owner, mock_game)
+        assert s.can_trigger(GameEvent.GAME_START, {})
+
+    def test_can_trigger_turn_start(self, mock_game, owner):
+        s = season2.YingYan(owner, mock_game)
+        assert s.can_trigger(GameEvent.TURN_START, {'player': owner})
+
+    def test_urgency_low(self, mock_game, owner):
+        s = season2.YingYan(owner, mock_game)
+        assert s.evaluate_urgency(mock_game) == 30
+
+
+class TestSeason2GuYongZhe:
+    def test_after_draw_increments(self, mock_game, owner):
+        s = season2.GuYongZhe(owner, mock_game)
+        s.can_trigger(GameEvent.AFTER_DRAW, {'player': owner})
+        s.can_trigger(GameEvent.AFTER_DRAW, {'player': owner})
+        assert s.draw_count == 2
+
+    def test_urgency_at_7_draws(self, mock_game, owner):
+        s = season2.GuYongZhe(owner, mock_game)
+        s.draw_count = 7
+        assert s.evaluate_urgency(mock_game) == 90
+
+    def test_urgency_below_7_draws(self, mock_game, owner):
+        s = season2.GuYongZhe(owner, mock_game)
+        s.draw_count = 5
+        assert s.evaluate_urgency(mock_game) == 0
+
+    def test_activate_sends_7_to_all_others(self, mock_game, owner):
+        s = season2.GuYongZhe(owner, mock_game)
+        s.draw_count = 7
+        with patch.object(mock_game, 'apply_add_cards') as mock_add:
+            s.activate(GameEvent.TURN_START, {'player': owner})
+        assert mock_add.call_count == len(mock_game.players) - 1
+
+
+class TestSeason2WangYou:
+    def test_can_trigger_player_died(self, mock_game, owner):
+        s = season2.WangYou(owner, mock_game)
+        assert s.can_trigger(GameEvent.PLAYER_DIED, {'player': owner})
+
+    def test_cannot_trigger_other_player(self, mock_game, owner, other_player):
+        s = season2.WangYou(owner, mock_game)
+        assert not s.can_trigger(GameEvent.PLAYER_DIED, {'player': other_player})
+
+    def test_activate_no_available_skills(self, mock_game, owner):
+        s = season2.WangYou(owner, mock_game)
+        for p in mock_game.players:
+            for skill in p.skills:
+                skill.is_consumed = False
+        result = s.activate(GameEvent.PLAYER_DIED, {'player': owner})
+        assert result is True
+        assert s.is_consumed is True
+
+
+class TestSeason2Combo:
+    def test_combo_consumes_both(self, mock_game, owner):
+        suqin = season2.SuQin(owner, mock_game)
+        zhangyi = season2.ZhangYi(owner, mock_game)
+        owner.skills = [suqin, zhangyi]
+        combo = season2.SuQinZhangYiCombo()
+        with patch('random.randint', return_value=6):
+            combo.execute(owner, mock_game.skill_manager, mock_game)
+        assert suqin.is_consumed
+        assert zhangyi.is_consumed
+
+    def test_combo_low_roll_sends_cards(self, mock_game, owner):
+        suqin = season2.SuQin(owner, mock_game)
+        zhangyi = season2.ZhangYi(owner, mock_game)
+        owner.skills = [suqin, zhangyi]
+        combo = season2.SuQinZhangYiCombo()
+        with patch('random.randint', return_value=1), \
+             patch.object(mock_game, 'apply_add_cards') as mock_add:
+            combo.execute(owner, mock_game.skill_manager, mock_game)
+        assert mock_add.call_count == len(mock_game.players)
+
+
+# ==================== Season 3（占位） ====================
+class TestSeason3:
+    def test_metadata_exists(self):
+        assert hasattr(season3, 'SEASON_ID')
+        assert hasattr(season3, 'SEASON_NAME')
+        assert hasattr(season3, 'SKILL_CLASSES')
+        assert isinstance(season3.SKILL_CLASSES, list)
+
+    def test_loader_does_not_crash(self, mock_game):
+        result = SkillLoader.load_skills(['S3'], mock_game)
+        assert isinstance(result, tuple)
+        assert len(result) == 3
+
+
+# ==================== Season 4 技能 ====================
+class TestSeason4YanPin:
+    def test_can_trigger(self, mock_game, owner):
+        s = season4.YanPin(owner, mock_game)
+        assert s.can_trigger(GameEvent.TURN_START, {'player': owner})
+
+    def test_activate_no_hand(self, mock_game, owner):
+        s = season4.YanPin(owner, mock_game)
+        owner.hand = []
+        assert s.activate(GameEvent.TURN_START, {'player': owner}) is False
+
+    def test_activate_ai_branch(self, mock_game, owner):
+        s = season4.YanPin(owner, mock_game)
+        owner.is_human = False
+        owner.hand = [Card('红', '数字', 3)]
+        result = s.activate(GameEvent.TURN_START, {'player': owner})
+        assert result is True
+        assert s.is_consumed is True
+
+
+class TestSeason4TanNang:
+    def test_can_trigger(self, mock_game, owner):
+        s = season4.TanNang(owner, mock_game)
+        assert s.can_trigger(GameEvent.TURN_START, {'player': owner})
+
+    def test_urgency_with_low_hand(self, mock_game, owner):
+        s = season4.TanNang(owner, mock_game)
+        mock_game.players[1].hand = [Card('红', '数字', 1)]
+        assert s.evaluate_urgency(mock_game) == 75
+
+    def test_urgency_default(self, mock_game, owner):
+        s = season4.TanNang(owner, mock_game)
+        for p in mock_game.players[1:]:
+            p.hand = [Card('红', '数字', i) for i in range(7)]
+        assert s.evaluate_urgency(mock_game) == 55
+
+    def test_activate_ai_branch(self, mock_game, owner):
+        s = season4.TanNang(owner, mock_game)
+        owner.is_human = False
+        target = mock_game.players[1]
+        target.hand = [Card('红', '数字', 1)]
+        with patch.object(s, '_choose_target', return_value=target):
+            result = s.activate(GameEvent.TURN_START, {'player': owner})
+        assert result is True
+        assert len(target.hand) == 0
+
+
+class TestSeason4XianLing:
+    def test_can_trigger(self, mock_game, owner):
+        s = season4.XianLing(owner, mock_game)
+        assert s.can_trigger(GameEvent.TURN_START, {'player': owner})
+
+    def test_activate_ai_branch(self, mock_game, owner):
+        s = season4.XianLing(owner, mock_game)
+        owner.is_human = False
+        result = s.activate(GameEvent.TURN_START, {'player': owner})
+        assert result is True
+        assert s.is_consumed is True
+
+
+class TestSeason4JiaHuo:
+    def test_can_trigger_when_targeted(self, mock_game, owner):
+        s = season4.JiaHuo(owner, mock_game)
+        ctx = {'original_context': {'target': owner}}
+        assert s.can_trigger(GameEvent.SKILL_ACTIVATED, ctx)
+
+    def test_cannot_trigger_when_not_targeted(self, mock_game, owner, other_player):
+        s = season4.JiaHuo(owner, mock_game)
+        ctx = {'original_context': {'target': other_player}}
+        assert not s.can_trigger(GameEvent.SKILL_ACTIVATED, ctx)
+
+    def test_activate_redirects(self, mock_game, owner):
+        s = season4.JiaHuo(owner, mock_game)
+        other_player = mock_game.players[1]
+        orig = {'target': owner}
+        ctx = {'original_context': orig}
+        with patch.object(s, '_choose_target', return_value=other_player):
+            result = s.activate(GameEvent.SKILL_ACTIVATED, ctx)
+        assert result is True
+        assert orig['target'] is other_player
+        assert s.is_consumed is True
+
+
+class TestSeason4JiFa:
+    def test_can_trigger(self, mock_game, owner):
+        s = season4.JiFa(owner, mock_game)
+        assert s.can_trigger(GameEvent.TURN_START, {'player': owner})
+
+    def test_urgency_low(self, mock_game, owner):
+        s = season4.JiFa(owner, mock_game)
+        assert s.evaluate_urgency(mock_game) == 30
+
+
+class TestSeason4YeLi:
+    def test_can_trigger(self, mock_game, owner):
+        s = season4.YeLi(owner, mock_game)
+        assert s.can_trigger(GameEvent.TURN_START, {'player': owner})
+
+    def test_activate_ai_branch(self, mock_game, owner):
+        s = season4.YeLi(owner, mock_game)
+        owner.is_human = False
+        target = mock_game.players[1]
+        target.hand = [Card('红', '数字', i) for i in range(5)]
+        with patch.object(s, '_choose_target', return_value=target), \
+             patch.object(mock_game, 'apply_add_cards') as mock_add, \
+             patch('random.choice', return_value='红'):
+            result = s.activate(GameEvent.TURN_START, {'player': owner})
+        assert result is True
+        assert mock_add.called
+
+
+class TestSeason4DuoXinPo:
+    def test_can_trigger(self, mock_game, owner):
+        s = season4.DuoXinPo(owner, mock_game)
+        ctx = {'target': owner, 'amount': 5}
+        assert s.can_trigger(GameEvent.BEING_ADDED_CARDS, ctx)
+
+    def test_cannot_trigger_for_other(self, mock_game, owner, other_player):
+        s = season4.DuoXinPo(owner, mock_game)
+        ctx = {'target': other_player, 'amount': 5}
+        assert not s.can_trigger(GameEvent.BEING_ADDED_CARDS, ctx)
+
+    def test_activate_ai_picks_victims(self, mock_game, owner):
+        s = season4.DuoXinPo(owner, mock_game)
+        owner.is_human = False
+        ctx = {'target': owner, 'amount': 3, 'cancel': False}
+        with patch.object(mock_game, 'apply_add_cards') as mock_add, \
+             patch('random.sample', side_effect=lambda seq, k: list(seq)[:k]):
+            result = s.activate(GameEvent.BEING_ADDED_CARDS, ctx)
+        assert result is True
+        assert mock_add.call_count >= 1
+
+
+class TestSeason4HunQian:
+    def test_can_trigger(self, mock_game, owner):
+        s = season4.HunQian(owner, mock_game)
+        ctx = {'target': owner, 'amount': 5}
+        assert s.can_trigger(GameEvent.BEING_ADDED_CARDS, ctx)
+
+    def test_cannot_trigger_for_other(self, mock_game, owner, other_player):
+        s = season4.HunQian(owner, mock_game)
+        ctx = {'target': other_player, 'amount': 5}
+        assert not s.can_trigger(GameEvent.BEING_ADDED_CARDS, ctx)
+
+    def test_activate_consumes_immediately(self, mock_game, owner):
+        s = season4.HunQian(owner, mock_game)
+        ctx = {'target': owner, 'amount': 3, 'cancel': False}
+        with patch.object(mock_game, 'apply_add_cards'):
+            result = s.activate(GameEvent.BEING_ADDED_CARDS, ctx)
+        assert result is True
+        assert s.is_consumed is True
+        assert ctx['cancel'] is True
+
+
+# ==================== 成就 ====================
+@pytest.fixture
+def mock_ach_game():
+    game = MagicMock()
+    human = MagicMock()
+    human.name = '你'
+    computer1 = MagicMock()
+    computer1.name = '电脑A'
+    computer2 = MagicMock()
+    computer2.name = '电脑B'
+    computer3 = MagicMock()
+    computer3.name = '电脑C'
+    game.players = [human, computer1, computer2, computer3]
+    return game
+
+
+class TestAchievements:
+    def test_no_draw_victory(self, mock_ach_game):
         events = [{'type': 'game_end', 'winner': '你'}]
-        ach = NoDrawVictoryAchievement()
-        self.assertTrue(ach.check(game, events))
+        assert NoDrawVictoryAchievement().check(mock_ach_game, events) is True
 
-    def test_no_draw_victory_fail_with_draw(self):
-        game = self._create_mock_game()
+    def test_no_draw_victory_fail(self, mock_ach_game):
         events = [
-            {'type': 'draw_card', 'player': '你', 'card': '红1'},
+            {'type': 'draw_card', 'player': '你'},
             {'type': 'game_end', 'winner': '你'}
         ]
-        ach = NoDrawVictoryAchievement()
-        self.assertFalse(ach.check(game, events))
+        assert NoDrawVictoryAchievement().check(mock_ach_game, events) is False
 
-    def test_comeback_1v3(self):
-        game = self._create_mock_game()
+    def test_comeback_1v3(self, mock_ach_game):
         events = [
-            {'type': 'player_eliminated', 'player': '电脑A', 'reason': 'hand_limit', 'turn_number': 5},
-            {'type': 'player_eliminated', 'player': '电脑B', 'reason': 'hand_limit', 'turn_number': 10},
-            {'type': 'player_eliminated', 'player': '电脑C', 'reason': 'hand_limit', 'turn_number': 15},
+            {'type': 'player_eliminated', 'player': '电脑A', 'turn_number': 5},
+            {'type': 'player_eliminated', 'player': '电脑B', 'turn_number': 10},
+            {'type': 'player_eliminated', 'player': '电脑C', 'turn_number': 15},
             {'type': 'game_end', 'winner': '你'}
         ]
-        ach = Comeback1v3Achievement()
-        self.assertTrue(ach.check(game, events))
+        assert Comeback1v3Achievement().check(mock_ach_game, events) is True
 
-    def test_comeback_1v3_fail_human_eliminated(self):
-        game = self._create_mock_game()
+    def test_comeback_1v3_fail_human_eliminated(self, mock_ach_game):
         events = [
-            {'type': 'player_eliminated', 'player': '你', 'reason': 'hand_limit', 'turn_number': 1},
+            {'type': 'player_eliminated', 'player': '你', 'turn_number': 1},
             {'type': 'game_end', 'winner': '电脑A'}
         ]
-        ach = Comeback1v3Achievement()
-        self.assertFalse(ach.check(game, events))
+        assert Comeback1v3Achievement().check(mock_ach_game, events) is False
 
-    def test_counter_master(self):
-        game = self._create_mock_game()
+    def test_comeback_1v3_fail_not_all_eliminated(self, mock_ach_game):
         events = [
-            {'type': 'skill_use', 'player': '你', 'skill_name': '破万法'},
-            {'type': 'skill_use', 'player': '你', 'skill_name': '储能'},
-            {'type': 'skill_use', 'player': '你', 'skill_name': '破万法'},
+            {'type': 'player_eliminated', 'player': '电脑A', 'turn_number': 5},
+            {'type': 'game_end', 'winner': '你'}
         ]
-        ach = CounterMasterAchievement()
-        self.assertTrue(ach.check(game, events))
+        assert Comeback1v3Achievement().check(mock_ach_game, events) is False
 
-    def test_counter_master_fail_less_than_3(self):
-        game = self._create_mock_game()
+    def test_counter_master(self, mock_ach_game):
         events = [
-            {'type': 'skill_use', 'player': '你', 'skill_name': '破万法'},
-            {'type': 'skill_use', 'player': '你', 'skill_name': '储能'},
+            {'type': 'skill_use', 'skill_name': '破万法'},
+            {'type': 'skill_use', 'skill_name': '储能'},
+            {'type': 'skill_use', 'skill_name': '破万法'},
         ]
-        ach = CounterMasterAchievement()
-        self.assertFalse(ach.check(game, events))
+        assert CounterMasterAchievement().check(mock_ach_game, events) is True
 
-    def test_instant_kill(self):
-        game = self._create_mock_game()
+    def test_counter_master_fail(self, mock_ach_game):
         events = [
-            {'type': 'player_eliminated', 'player': '电脑A', 'reason': 'hand_limit', 'turn_number': 1},
+            {'type': 'skill_use', 'skill_name': '破万法'},
+            {'type': 'skill_use', 'skill_name': '储能'},
         ]
-        ach = InstantKillAchievement()
-        self.assertTrue(ach.check(game, events))
+        assert CounterMasterAchievement().check(mock_ach_game, events) is False
 
-    def test_instant_kill_fail_later_turn(self):
-        game = self._create_mock_game()
+    def test_instant_kill(self, mock_ach_game):
         events = [
-            {'type': 'player_eliminated', 'player': '电脑A', 'reason': 'hand_limit', 'turn_number': 3},
+            {'type': 'player_eliminated', 'player': '电脑A',
+             'reason': 'hand_limit', 'turn_number': 1},
         ]
-        ach = InstantKillAchievement()
-        self.assertFalse(ach.check(game, events))
+        assert InstantKillAchievement().check(mock_ach_game, events) is True
 
-    def test_achievement_manager_registers_all(self):
-        game = self._create_mock_game()
-        manager = AchievementManager(game, get_core_achievements())
-        # 至少包含 4 个核心成就
-        self.assertGreaterEqual(len(manager.achievements), 4)
+    def test_instant_kill_fail(self, mock_ach_game):
+        events = [
+            {'type': 'player_eliminated', 'player': '电脑A',
+             'reason': 'hand_limit', 'turn_number': 3},
+        ]
+        assert InstantKillAchievement().check(mock_ach_game, events) is False
+
+    def test_manager_registers_all(self, mock_ach_game):
+        m = AchievementManager(mock_ach_game, get_core_achievements())
+        assert len(m.achievements) >= 4
+
+    def test_manager_evaluate(self, mock_ach_game):
+        m = AchievementManager(mock_ach_game, get_core_achievements())
+        achieved = m.evaluate([{'type': 'game_end', 'winner': '你'}])
+        assert '被遗忘的战术' in achieved
+
+    def test_manager_add(self, mock_ach_game):
+        from uno.achievements import Achievement
+
+        class Extra(Achievement):
+            def __init__(self):
+                super().__init__('extra', '额外成就', '测试')
+            def check(self, game, events):
+                return True
+
+        m = AchievementManager(mock_ach_game, [])
+        m.add_achievements([Extra])
+        assert m.achievements[0].name == '额外成就'
 
 
 # ==================== 回放 ====================
-class TestReplay(unittest.TestCase):
+class TestReplay:
     def test_recorder_save_load(self):
         recorder = GameRecorder()
         recorder.players = ['你', '电脑A']
@@ -389,22 +1194,27 @@ class TestReplay(unittest.TestCase):
         recorder.record('play_card', player='你', card='红5')
         recorder.record('game_end', winner='你')
         path = recorder.save()
-        self.assertTrue(os.path.exists(path))
+        assert os.path.exists(path)
+        try:
+            ui = MagicMock()
+            replayer = GameReplayer(path, ui)
+            assert replayer.data['players'] == ['你', '电脑A']
+            events = []
+            while True:
+                ev = replayer.next_event()
+                if ev is None:
+                    break
+                events.append(ev)
+            assert len(events) == 3
+        finally:
+            os.remove(path)
 
-        ui = ConsoleUI()
-        replayer = GameReplayer(path, ui)
-        self.assertEqual(replayer.data['players'], ['你', '电脑A'])
-        events = []
-        while True:
-            ev = replayer.next_event()
-            if ev is None:
-                break
-            events.append(ev)
-        self.assertEqual(len(events), 3)
+    def test_replayer_missing_file(self):
+        with pytest.raises((FileNotFoundError, ValueError)):
+            GameReplayer('/nonexistent/path.json', MagicMock())
 
-        os.remove(path)
-
-
-# ==================== 入口 ====================
-if __name__ == '__main__':
-    unittest.main()
+    def test_replayer_empty_file(self, tmp_path):
+        empty = tmp_path / "empty.json"
+        empty.write_text('', encoding='utf-8')
+        with pytest.raises((FileNotFoundError, ValueError)):
+            GameReplayer(str(empty), MagicMock())

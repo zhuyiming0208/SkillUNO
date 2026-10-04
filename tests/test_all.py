@@ -2223,3 +2223,595 @@ class TestSeason4HunQian:
             s.activate(GameEvent.BEING_ADDED_CARDS, ctx)
         assert mock_add.call_args[0][0] is mock_game.players[1]
         assert mock_add.call_args[0][1] == 3
+
+# ==================== Season 1 技能 ====================
+# ---------- PoWanFa（破万法）----------
+class TestSeason1PoWanFa:
+    def test_can_trigger_skill_activated(self, mock_game, owner):
+        s = season1.PoWanFa(owner, mock_game)
+        other_skill = season1.ChuNeng(mock_game.players[1], mock_game)
+        ctx = {'activated_skill': other_skill}
+        assert s.can_trigger(GameEvent.SKILL_ACTIVATED, ctx)
+
+    def test_cannot_trigger_empty_context(self, mock_game, owner):
+        s = season1.PoWanFa(owner, mock_game)
+        assert not s.can_trigger(GameEvent.SKILL_ACTIVATED, {})
+
+    def test_cannot_trigger_when_consumed(self, mock_game, owner):
+        s = season1.PoWanFa(owner, mock_game)
+        s.is_consumed = True
+        other_skill = season1.ChuNeng(mock_game.players[1], mock_game)
+        ctx = {'activated_skill': other_skill}
+        assert not s.can_trigger(GameEvent.SKILL_ACTIVATED, ctx)
+
+    def test_activate_breaks_other_skill(self, mock_game, owner):
+        s = season1.PoWanFa(owner, mock_game)
+        other = mock_game.players[1]
+        target = season1.ChuNeng(other, mock_game)
+        ctx = {'activated_skill': target, 'cancel': False}
+        result = s.activate(GameEvent.SKILL_ACTIVATED, ctx)
+        assert result is True
+        assert target.is_consumed is True
+        assert ctx['cancel'] is True
+        assert s.is_consumed is True
+
+    def test_activate_ignores_own_skill(self, mock_game, owner):
+        s = season1.PoWanFa(owner, mock_game)
+        target = season1.ChuNeng(owner, mock_game)
+        ctx = {'activated_skill': target, 'cancel': False}
+        result = s.activate(GameEvent.SKILL_ACTIVATED, ctx)
+        assert result is False
+
+
+# ---------- QiaoWu（巧物）----------
+class TestSeason1QiaoWu:
+    def test_can_trigger_turn_start(self, mock_game, owner):
+        s = season1.QiaoWu(owner, mock_game)
+        assert s.can_trigger(GameEvent.TURN_START, {})
+
+    def test_activate_no_available_skills(self, mock_game, owner):
+        s = season1.QiaoWu(owner, mock_game)
+        mock_game.skill_pool.clear()
+        result = s.activate(GameEvent.TURN_START, {})
+        assert result is False
+
+    def test_activate_ai_copies_random_skill(self, mock_game, owner):
+        s = season1.QiaoWu(owner, mock_game)
+        owner.is_human = False
+        # 确保技能池里有可复制的技能
+        target = season1.ZhaoZai(mock_game.players[1], mock_game)
+        mock_game.skill_pool = [target]
+        with patch.object(target, 'activate') as mock_act:
+            result = s.activate(GameEvent.TURN_START, {})
+        assert result is True
+        assert s.is_consumed is True
+
+    def test_activate_human_picks_from_list(self, mock_game, human_player):
+        s = season1.QiaoWu(human_player, mock_game)
+        human_player.is_human = True
+        target = season1.ZhaoZai(mock_game.players[1], mock_game)
+        mock_game.skill_pool = [target]
+        human_player.ui.input = MagicMock(return_value='0')
+        with patch.object(target.__class__, 'activate'):
+            result = s.activate(GameEvent.TURN_START, {})
+        assert result is True
+        assert s.is_consumed is True
+
+
+# ---------- ShengShengBuXi（生生不息）----------
+class TestSeason1ShengShengBuXi:
+    def test_can_trigger_player_died_self(self, mock_game, owner):
+        s = season1.ShengShengBuXi(owner, mock_game)
+        assert s.can_trigger(GameEvent.PLAYER_DIED, {'player': owner})
+
+    def test_cannot_trigger_other_player(self, mock_game, owner, other_player):
+        s = season1.ShengShengBuXi(owner, mock_game)
+        assert not s.can_trigger(GameEvent.PLAYER_DIED, {'player': other_player})
+
+    def test_activate_revives_with_5_cards(self, mock_game, owner):
+        s = season1.ShengShengBuXi(owner, mock_game)
+        owner.eliminated = True
+        owner.hand = []
+        result = s.activate(GameEvent.PLAYER_DIED, {'player': owner})
+        assert result is True
+        assert owner.eliminated is False
+        assert owner.hand_limit == 25
+        assert len(owner.hand) == 5
+        assert s.is_consumed is True
+
+
+# ---------- ChuNeng（储能）----------
+class TestSeason1ChuNeng:
+    def test_can_trigger_skill_activated(self, mock_game, owner):
+        s = season1.ChuNeng(owner, mock_game)
+        other_skill = season1.ZhaoZai(mock_game.players[1], mock_game)
+        assert s.can_trigger(GameEvent.SKILL_ACTIVATED, {'activated_skill': other_skill})
+
+    def test_activate_steals_skill(self, mock_game, owner):
+        s = season1.ChuNeng(owner, mock_game)
+        other = mock_game.players[1]
+        target = season1.ZhaoZai(other, mock_game)
+        other.skills = [target]
+        ctx = {'activated_skill': target, 'cancel': False}
+        result = s.activate(GameEvent.SKILL_ACTIVATED, ctx)
+        assert result is True
+        assert target.owner is owner
+        assert target in owner.skills
+        assert target not in other.skills
+        assert target.is_consumed is False
+        assert ctx['cancel'] is True
+        assert s.is_consumed is True
+
+    def test_activate_ignores_own_skill(self, mock_game, owner):
+        s = season1.ChuNeng(owner, mock_game)
+        target = season1.ZhaoZai(owner, mock_game)
+        ctx = {'activated_skill': target, 'cancel': False}
+        result = s.activate(GameEvent.SKILL_ACTIVATED, ctx)
+        assert result is False
+
+
+# ---------- QiangYun（强运）----------
+class TestSeason1QiangYun:
+    def test_can_trigger_game_start(self, mock_game, owner):
+        s = season1.QiangYun(owner, mock_game)
+        assert s.can_trigger(GameEvent.GAME_START, {})
+
+    def test_activate_gets_1_or_2_skills(self, mock_game, owner):
+        s = season1.QiangYun(owner, mock_game)
+        owner.skills = []
+        # 技能池准备至少 2 个可分配的技能
+        pool = [season1.ZhaoZai(None, mock_game) for _ in range(5)]
+        for i, sk in enumerate(pool):
+            sk.owner = None
+        mock_game.skill_pool = pool
+        with patch('random.randint', return_value=2):
+            result = s.activate(GameEvent.GAME_START, {})
+        assert result is True
+        assert s.is_consumed is True
+        # 至少获得 1 张（如果池子足够就是 2 张）
+        assert len(owner.skills) >= 1
+
+
+# ---------- LiXi（离析）----------
+class TestSeason1LiXi:
+    def test_can_trigger_being_added(self, mock_game, owner):
+        s = season1.LiXi(owner, mock_game)
+        assert s.can_trigger(GameEvent.BEING_ADDED_CARDS,
+                             {'target': owner, 'amount': 5})
+
+    def test_cannot_trigger_for_other(self, mock_game, owner, other_player):
+        s = season1.LiXi(owner, mock_game)
+        assert not s.can_trigger(GameEvent.BEING_ADDED_CARDS,
+                                 {'target': other_player, 'amount': 5})
+
+    def test_activate_cancels_add(self, mock_game, owner):
+        s = season1.LiXi(owner, mock_game)
+        ctx = {'target': owner, 'amount': 5, 'cancel': False}
+        result = s.activate(GameEvent.BEING_ADDED_CARDS, ctx)
+        assert result is True
+        assert ctx['cancel'] is True
+        assert s.is_consumed is True
+
+    def test_urgency_high_with_many_cards(self, mock_game, owner):
+        s = season1.LiXi(owner, mock_game)
+        owner.hand = [Card('红', '数字', i) for i in range(10)]
+        assert s.evaluate_urgency(mock_game) == 80
+
+    def test_urgency_default(self, mock_game, owner):
+        s = season1.LiXi(owner, mock_game)
+        owner.hand = [Card('红', '数字', 1)]
+        assert s.evaluate_urgency(mock_game) == 50
+
+
+# ---------- HuaXing（化形）----------
+class TestSeason1HuaXing:
+    def test_can_trigger_turn_start(self, mock_game, owner):
+        s = season1.HuaXing(owner, mock_game)
+        assert s.can_trigger(GameEvent.TURN_START, {'player': owner})
+
+    def test_urgency_high_when_few_cards(self, mock_game, owner):
+        s = season1.HuaXing(owner, mock_game)
+        owner.hand = [Card('红', '数字', 1)]
+        assert s.evaluate_urgency(mock_game) == 70
+
+    def test_urgency_low_when_many_cards(self, mock_game, owner):
+        s = season1.HuaXing(owner, mock_game)
+        owner.hand = [Card('红', '数字', i) for i in range(13)]
+        assert s.evaluate_urgency(mock_game) == 20
+
+    def test_urgency_medium(self, mock_game, owner):
+        s = season1.HuaXing(owner, mock_game)
+        owner.hand = [Card('红', '数字', i) for i in range(6)]
+        assert s.evaluate_urgency(mock_game) == 45
+
+    def test_activate_no_other_players(self, mock_game, owner):
+        s = season1.HuaXing(owner, mock_game)
+        for p in mock_game.players[1:]:
+            p.eliminated = True
+        result = s.activate(GameEvent.TURN_START, {'player': owner})
+        assert result is False
+
+    def test_activate_swaps_hands_ai(self, mock_game, owner):
+        s = season1.HuaXing(owner, mock_game)
+        owner.is_human = False
+        target = mock_game.players[1]
+        owner.hand = [Card('红', '数字', 1)]
+        target.hand = [Card('蓝', '数字', 2)]
+        # 第一次 random.choice（choose_target 内部）→ 返回 target
+        # 第二次 random.choice（mode 选择）→ 返回 True 走"手牌"
+        with patch('random.choice', side_effect=[target, True]):
+            result = s.activate(GameEvent.TURN_START, {'player': owner})
+        assert result is True
+        assert s.is_consumed is True
+        # 交换后，owner 拿到对方的牌
+        assert len(owner.hand) == 1
+        assert owner.hand[0].color == '蓝'
+        assert target.hand[0].color == '红'
+
+    def test_activate_swaps_skills_ai(self, mock_game, owner):
+        """AI 分支交换技能。"""
+        s = season1.HuaXing(owner, mock_game)
+        owner.is_human = False
+        target = mock_game.players[1]
+        owner_skill = season1.ZhaoZai(owner, mock_game)
+        target_skill = season1.JingLei(target, mock_game)
+        owner.skills = [owner_skill]
+        target.skills = [target_skill]
+        # 第一次 random.choice 选目标，第二次 random.choice 返回 False 走"技能"
+        with patch('random.choice', side_effect=[target, False]):
+            result = s.activate(GameEvent.TURN_START, {'player': owner})
+        assert result is True
+        assert s.is_consumed is True
+        # 技能交换后，owner 拥有 target 的旧技能
+        assert target_skill in owner.skills
+        assert owner_skill in target.skills
+        assert target_skill.owner is owner
+        assert owner_skill.owner is target
+
+    def test_activate_human_swaps_hands(self, mock_game, human_player):
+        s = season1.HuaXing(human_player, mock_game)
+        human_player.is_human = True
+        target = mock_game.players[1]
+        human_player.hand = [Card('红', '数字', 1)]
+        target.hand = [Card('蓝', '数字', 2)]
+        # 直接 patch choose_target，避开 random.choice 冲突
+        # 人类只走一次 input："1" 表示交换手牌
+        human_player.ui.input = MagicMock(return_value='1')
+        with patch.object(s, 'choose_target', return_value=target):
+            result = s.activate(GameEvent.TURN_START, {'player': human_player})
+        assert result is True
+        assert s.is_consumed is True
+        assert human_player.hand[0].color == '蓝'
+        assert target.hand[0].color == '红'
+
+    def test_activate_human_swaps_skills(self, mock_game, human_player):
+        s = season1.HuaXing(human_player, mock_game)
+        human_player.is_human = True
+        target = mock_game.players[1]
+        owner_skill = season1.ZhaoZai(human_player, mock_game)
+        target_skill = season1.JingLei(target, mock_game)
+        human_player.skills = [owner_skill]
+        target.skills = [target_skill]
+        # 人类输入 "2" 表示交换技能
+        human_player.ui.input = MagicMock(return_value='2')
+        with patch.object(s, 'choose_target', return_value=target):
+            result = s.activate(GameEvent.TURN_START, {'player': human_player})
+        assert result is True
+        assert s.is_consumed is True
+        assert target_skill in human_player.skills
+        assert owner_skill in target.skills
+
+    def test_choose_target_ai(self, mock_game, owner):
+        s = season1.HuaXing(owner, mock_game)
+        owner.is_human = False
+        target = s.choose_target()
+        assert target is not None
+        assert target is not owner
+        assert not target.eliminated
+
+    def test_choose_target_human(self, mock_game, human_player):
+        s = season1.HuaXing(human_player, mock_game)
+        human_player.is_human = True
+        human_player.ui.input = MagicMock(return_value='0')
+        target = s.choose_target()
+        assert target is not None
+        assert target is not human_player
+
+    def test_choose_target_no_candidates(self, mock_game, owner):
+        s = season1.HuaXing(owner, mock_game)
+        for p in mock_game.players[1:]:
+            p.eliminated = True
+        assert s.choose_target() is None
+
+
+# ---------- HuoShui（祸水）----------
+class TestSeason1HuoShui:
+    def test_can_trigger_being_added(self, mock_game, owner):
+        s = season1.HuoShui(owner, mock_game)
+        assert s.can_trigger(GameEvent.BEING_ADDED_CARDS,
+                             {'target': owner, 'amount': 5})
+
+    def test_urgency_high_with_many(self, mock_game, owner):
+        s = season1.HuoShui(owner, mock_game)
+        owner.hand = [Card('红', '数字', i) for i in range(10)]
+        assert s.evaluate_urgency(mock_game) == 80
+
+    def test_urgency_default(self, mock_game, owner):
+        s = season1.HuoShui(owner, mock_game)
+        owner.hand = [Card('红', '数字', 1)]
+        assert s.evaluate_urgency(mock_game) == 50
+
+    def test_activate_transfers_to_other(self, mock_game, owner):
+        s = season1.HuoShui(owner, mock_game)
+        ctx = {'target': owner, 'amount': 5, 'cancel': False}
+        with patch.object(s, 'choose_target', return_value=mock_game.players[1]):
+            result = s.activate(GameEvent.BEING_ADDED_CARDS, ctx)
+        assert result is True
+        assert ctx['target'] is mock_game.players[1]
+        assert s.is_consumed is True
+
+    def test_activate_no_target_returns_false(self, mock_game, owner):
+        s = season1.HuoShui(owner, mock_game)
+        ctx = {'target': owner, 'amount': 5, 'cancel': False}
+        with patch.object(s, 'choose_target', return_value=None):
+            result = s.activate(GameEvent.BEING_ADDED_CARDS, ctx)
+        assert result is False
+
+
+# ---------- BuMie（不灭）----------
+class TestSeason1BuMie:
+    def test_can_trigger_player_died_self(self, mock_game, owner):
+        s = season1.BuMie(owner, mock_game)
+        assert s.can_trigger(GameEvent.PLAYER_DIED, {'player': owner})
+
+    def test_cannot_trigger_other(self, mock_game, owner, other_player):
+        s = season1.BuMie(owner, mock_game)
+        assert not s.can_trigger(GameEvent.PLAYER_DIED, {'player': other_player})
+
+    def test_activate_revives_trims_hand(self, mock_game, owner):
+        s = season1.BuMie(owner, mock_game)
+        owner.eliminated = True
+        owner.hand = [Card('红', '数字', i) for i in range(15)]
+        # 给一个额外技能，方便测试"丢弃 1 张技能"
+        extra = season1.ZhaoZai(owner, mock_game)
+        owner.skills = [s, extra]
+        result = s.activate(GameEvent.PLAYER_DIED, {'player': owner})
+        assert result is True
+        assert owner.eliminated is False
+        assert len(owner.hand) == 10
+        assert s.is_consumed is True
+        # 额外技能被丢弃
+        assert extra not in owner.skills
+
+
+# ---------- WuJianDao（无间道）----------
+class TestSeason1WuJianDao:
+    def test_can_trigger_turn_start_unbound(self, mock_game, owner):
+        s = season1.WuJianDao(owner, mock_game)
+        assert s.can_trigger(GameEvent.TURN_START, {'player': owner})
+
+    def test_cannot_trigger_turn_start_bound(self, mock_game, owner):
+        s = season1.WuJianDao(owner, mock_game)
+        s.bound_target = mock_game.players[1]
+        assert not s.can_trigger(GameEvent.TURN_START, {'player': owner})
+
+    def test_can_trigger_cards_added_on_target(self, mock_game, owner):
+        s = season1.WuJianDao(owner, mock_game)
+        target = mock_game.players[1]
+        s.bound_target = target
+        assert s.can_trigger(GameEvent.CARDS_ADDED, {'target': target, 'amount': 3})
+
+    def test_activate_turn_start_binds(self, mock_game, owner):
+        s = season1.WuJianDao(owner, mock_game)
+        target = mock_game.players[1]
+        with patch.object(s, 'choose_target', return_value=target):
+            result = s.activate(GameEvent.TURN_START, {'player': owner})
+        assert result is True
+        assert s.bound_target is target
+        assert s.times_left == 3
+
+    def test_activate_cards_added_removes_cards(self, mock_game, owner):
+        s = season1.WuJianDao(owner, mock_game)
+        target = mock_game.players[1]
+        s.bound_target = target
+        s.times_left = 3
+        owner.hand = [Card('红', '数字', i) for i in range(10)]
+        result = s.activate(GameEvent.CARDS_ADDED, {'target': target, 'amount': 3})
+        assert result is False
+        assert len(owner.hand) == 7
+        assert s.times_left == 2
+
+    def test_activate_cards_added_expires(self, mock_game, owner):
+        s = season1.WuJianDao(owner, mock_game)
+        target = mock_game.players[1]
+        s.bound_target = target
+        s.times_left = 1
+        owner.hand = [Card('红', '数字', 1)]
+        s.activate(GameEvent.CARDS_ADDED, {'target': target, 'amount': 3})
+        assert s.bound_target is None
+        assert s.is_consumed is True
+
+
+# ---------- DuXin（读心）----------
+class TestSeason1DuXin:
+    def test_can_trigger_turn_start(self, mock_game, owner):
+        s = season1.DuXin(owner, mock_game)
+        assert s.can_trigger(GameEvent.TURN_START, {'player': owner})
+
+    def test_activate_no_target(self, mock_game, owner):
+        s = season1.DuXin(owner, mock_game)
+        with patch.object(s, 'choose_target', return_value=None):
+            result = s.activate(GameEvent.TURN_START, {'player': owner})
+        assert result is False
+
+    def test_activate_ai_views_hand(self, mock_game, owner):
+        s = season1.DuXin(owner, mock_game)
+        owner.is_human = False
+        target = mock_game.players[1]
+        target.hand = [Card('红', '数字', 1), Card('蓝', '数字', 2)]
+        target.skills = []
+        with patch.object(s, 'choose_target', return_value=target), \
+             patch('random.choice', return_value='手牌'):
+            result = s.activate(GameEvent.TURN_START, {'player': owner})
+        assert result is True
+        assert s.is_consumed is True
+
+    def test_activate_ai_views_skills(self, mock_game, owner):
+        s = season1.DuXin(owner, mock_game)
+        owner.is_human = False
+        target = mock_game.players[1]
+        target.hand = []
+        target.skills = [season1.ZhaoZai(target, mock_game)]
+        with patch.object(s, 'choose_target', return_value=target), \
+             patch('random.choice', return_value='技能'):
+            result = s.activate(GameEvent.TURN_START, {'player': owner})
+        assert result is True
+
+    def test_activate_human_views_hand(self, mock_game, human_player):
+        s = season1.DuXin(human_player, mock_game)
+        human_player.is_human = True
+        target = mock_game.players[1]
+        target.hand = [Card('红', '数字', 1)]
+        human_player.ui.input = MagicMock(return_value='1')  # 看手牌
+        with patch.object(s, 'choose_target', return_value=target):
+            result = s.activate(GameEvent.TURN_START, {'player': human_player})
+        assert result is True
+
+
+# ---------- DianRen（癫人）----------
+class TestSeason1DianRen:
+    def test_can_trigger_player_died_self(self, mock_game, owner):
+        s = season1.DianRen(owner, mock_game)
+        assert s.can_trigger(GameEvent.PLAYER_DIED, {'player': owner})
+
+    def test_activate_inherits_dead_skills(self, mock_game, owner):
+        s = season1.DianRen(owner, mock_game)
+        dead_p = mock_game.players[1]
+        dead_p.eliminated = True
+        inherited = season1.ZhaoZai(dead_p, mock_game)
+        dead_p.skills = [inherited]
+        result = s.activate(GameEvent.PLAYER_DIED, {'player': owner})
+        assert result is True
+        assert inherited in owner.skills
+        assert inherited.owner is owner
+        assert s.is_consumed is True
+
+    def test_activate_no_dead_skills(self, mock_game, owner):
+        s = season1.DianRen(owner, mock_game)
+        for p in mock_game.players:
+            p.skills = []
+            p.eliminated = False
+        result = s.activate(GameEvent.PLAYER_DIED, {'player': owner})
+        assert result is True
+        assert s.is_consumed is True
+
+
+# ---------- ZhaoZai（招灾）----------
+class TestSeason1ZhaoZai:
+    def test_can_trigger_turn_start(self, mock_game, owner):
+        s = season1.ZhaoZai(owner, mock_game)
+        assert s.can_trigger(GameEvent.TURN_START, {'player': owner})
+
+    def test_urgency_high_with_weak_opponent(self, mock_game, owner):
+        s = season1.ZhaoZai(owner, mock_game)
+        mock_game.players[1].hand = [Card('红', '数字', 1)]
+        assert s.evaluate_urgency(mock_game) == 90
+
+    def test_urgency_default(self, mock_game, owner):
+        s = season1.ZhaoZai(owner, mock_game)
+        for p in mock_game.players[1:]:
+            p.hand = [Card('红', '数字', i) for i in range(7)]
+        assert s.evaluate_urgency(mock_game) == 40
+
+    def test_activate_adds_5_to_random(self, mock_game, owner):
+        s = season1.ZhaoZai(owner, mock_game)
+        # 清空技能，避免触发 START_RANDOM 时的额外逻辑
+        for p in mock_game.players:
+            p.skills = []
+        # 让随机选择固定返回 players[1]
+        with patch('random.choice', return_value=mock_game.players[1]), \
+             patch.object(mock_game, 'apply_add_cards') as mock_add:
+            result = s.activate(GameEvent.TURN_START, {'player': owner})
+        assert result is True
+        assert s.is_consumed is True
+        mock_add.assert_called_once_with(mock_game.players[1], 5)
+
+
+# ---------- JingLei（惊雷）----------
+class TestSeason1JingLei:
+    def test_can_trigger_turn_start(self, mock_game, owner):
+        s = season1.JingLei(owner, mock_game)
+        assert s.can_trigger(GameEvent.TURN_START, {'player': owner})
+
+    def test_urgency_high_risk_many_cards(self, mock_game, owner):
+        s = season1.JingLei(owner, mock_game)
+        owner.hand = [Card('红', '数字', i) for i in range(13)]
+        assert s.evaluate_urgency(mock_game) == 10
+
+    def test_urgency_low_when_few_cards(self, mock_game, owner):
+        s = season1.JingLei(owner, mock_game)
+        owner.hand = [Card('红', '数字', 1)]
+        assert s.evaluate_urgency(mock_game) == 40
+
+    def test_urgency_zero_default(self, mock_game, owner):
+        s = season1.JingLei(owner, mock_game)
+        owner.hand = [Card('红', '数字', i) for i in range(7)]
+        assert s.evaluate_urgency(mock_game) == 0
+
+    def test_activate_all_pass_no_penalty(self, mock_game, owner):
+        """所有玩家点数 ≥5，不触发加牌。"""
+        s = season1.JingLei(owner, mock_game)
+        for p in mock_game.players:
+            p.skills = []
+        with patch('random.randint', return_value=6), \
+             patch.object(mock_game, 'apply_add_cards') as mock_add:
+            result = s.activate(GameEvent.TURN_START, {'player': owner})
+        assert result is True
+        assert s.is_consumed is True
+        # 无人受罚
+        mock_add.assert_not_called()
+
+    def test_activate_all_fail_add_5(self, mock_game, owner):
+        """所有玩家点数 <5，全部加 5。"""
+        s = season1.JingLei(owner, mock_game)
+        for p in mock_game.players:
+            p.skills = []
+        with patch('random.randint', return_value=1), \
+             patch.object(mock_game, 'apply_add_cards') as mock_add:
+            result = s.activate(GameEvent.TURN_START, {'player': owner})
+        assert result is True
+        # 每个玩家各加 5
+        assert mock_add.call_count == len(mock_game.players)
+        for call in mock_add.call_args_list:
+            assert call[0][1] == 5
+
+
+# ---------- NongYan（浓烟）----------
+class TestSeason1NongYan:
+    def test_can_trigger_game_start(self, mock_game, owner):
+        s = season1.NongYan(owner, mock_game)
+        assert s.can_trigger(GameEvent.GAME_START, {})
+
+    def test_activate_hides_one_skill_from_each(self, mock_game, owner):
+        s = season1.NongYan(owner, mock_game)
+        # 给每个对手 2 个技能
+        for p in mock_game.players[1:]:
+            p.skills = [
+                season1.ZhaoZai(p, mock_game),
+                season1.JingLei(p, mock_game),
+            ]
+        result = s.activate(GameEvent.GAME_START, {})
+        assert result is True
+        assert s.is_consumed is True
+        # 每个对手应有 1 个被删除
+        for p in mock_game.players[1:]:
+            deleted = [sk for sk in p.skills if sk.is_deleted]
+            assert len(deleted) == 1
+
+    def test_activate_skips_targets_with_no_skills(self, mock_game, owner):
+        s = season1.NongYan(owner, mock_game)
+        for p in mock_game.players[1:]:
+            p.skills = []
+        result = s.activate(GameEvent.GAME_START, {})
+        assert result is True
+        assert s.is_consumed is True

@@ -2815,3 +2815,258 @@ class TestSeason1NongYan:
         result = s.activate(GameEvent.GAME_START, {})
         assert result is True
         assert s.is_consumed is True
+
+# ==================== Replay 补充测试 ====================
+class TestReplayInteractiveChoose:
+    @pytest.fixture(autouse=True)
+    def temp_records_dir(self, tmp_path, monkeypatch):
+        """把 RECORDS_DIR 指向临时目录，避免污染真实录像。"""
+        import uno.replay as replay_module
+        fake_dir = tmp_path / "records"
+        fake_dir.mkdir()
+        monkeypatch.setattr(replay_module, 'RECORDS_DIR', str(fake_dir))
+        self.replay_module = replay_module
+        self.records_dir = fake_dir
+
+    def _make_record(self, name, players=None, timestamp=None, events=None):
+        import json
+        data = {
+            "version": "v1.3.2",
+            "timestamp": timestamp or name,
+            "players": players or ['你', '电脑A'],
+            "seasons": ['S1'],
+            "initial_top_card": '红5',
+            "events": events or []
+        }
+        path = self.records_dir / name
+        path.write_text(json.dumps(data, ensure_ascii=False), encoding='utf-8')
+        return path
+
+    def test_list_records_empty(self):
+        assert self.replay_module.list_records() == []
+
+    def test_list_records_returns_sorted_latest_first(self):
+        self._make_record('replay_20260101_120000.json')
+        self._make_record('replay_20260102_120000.json')
+        records = self.replay_module.list_records()
+        assert len(records) == 2
+        assert '20260102' in records[0]
+
+    def test_interactive_choose_no_records_raises(self):
+        ui = MagicMock()
+        with pytest.raises(FileNotFoundError):
+            self.replay_module.GameReplayer.interactive_choose(ui)
+
+    def test_interactive_choose_empty_input_uses_latest(self):
+        self._make_record('replay_20260101_120000.json', players=['A'])
+        self._make_record('replay_20260102_120000.json', players=['B'])
+        ui = MagicMock()
+        ui.input = MagicMock(return_value='')
+        replayer = self.replay_module.GameReplayer.interactive_choose(ui)
+        assert replayer.data['players'] == ['B']
+
+    def test_interactive_choose_specific_index(self):
+        self._make_record('replay_20260101_120000.json', players=['A'])
+        self._make_record('replay_20260102_120000.json', players=['B'])
+        ui = MagicMock()
+        ui.input = MagicMock(return_value='1')   # 第二个（旧的）
+        replayer = self.replay_module.GameReplayer.interactive_choose(ui)
+        assert replayer.data['players'] == ['A']
+
+    def test_interactive_choose_invalid_index_falls_back_latest(self):
+        self._make_record('replay_20260101_120000.json', players=['A'])
+        ui = MagicMock()
+        ui.input = MagicMock(return_value='999')
+        replayer = self.replay_module.GameReplayer.interactive_choose(ui)
+        assert replayer.data['players'] == ['A']
+
+    def test_interactive_choose_non_numeric_falls_back_latest(self):
+        self._make_record('replay_20260101_120000.json', players=['A'])
+        ui = MagicMock()
+        ui.input = MagicMock(return_value='abc')
+        replayer = self.replay_module.GameReplayer.interactive_choose(ui)
+        assert replayer.data['players'] == ['A']
+
+    def test_interactive_choose_handles_corrupt_file(self):
+        """有坏文件时应被过滤，用户仍能选到好文件。"""
+        self._make_record('replay_20260101_120000.json', players=['A'])
+        # 坏文件时间戳更"新"，排序时排在前面
+        (self.records_dir / 'replay_20260102_120000.json').write_text(
+            'not-json', encoding='utf-8'
+        )
+        ui = MagicMock()
+        ui.input = MagicMock(return_value='')   # 回车选"最新"
+        replayer = self.replay_module.GameReplayer.interactive_choose(ui)
+        # 坏文件被过滤，实际拿到的是好文件
+        assert replayer.data['players'] == ['A']
+
+    def test_interactive_choose_all_corrupt_raises(self):
+        """全部损坏时应抛出 FileNotFoundError。"""
+        (self.records_dir / 'replay_20260101_120000.json').write_text(
+            'not-json', encoding='utf-8'
+        )
+        (self.records_dir / 'replay_20260102_120000.json').write_text(
+            '', encoding='utf-8'
+        )
+        ui = MagicMock()
+        with pytest.raises(FileNotFoundError):
+            self.replay_module.GameReplayer.interactive_choose(ui)
+
+    def test_interactive_choose_filters_display(self):
+        """列表中只显示可读文件，坏文件不出现。"""
+        self._make_record('replay_20260101_120000.json', players=['A'])
+        (self.records_dir / 'replay_20260102_120000.json').write_text(
+            'not-json', encoding='utf-8'
+        )
+        ui = MagicMock()
+        ui.input = MagicMock(return_value='')
+        self.replay_module.GameReplayer.interactive_choose(ui)
+        # 收集所有 ui.show 的输出
+        output = '\n'.join(str(call) for call in ui.show.call_args_list)
+        # 应该只有 1 个可选项（索引 0）
+        assert '  0:' in output
+        assert '  1:' not in output
+
+
+class TestReplayDisplay:
+    """测试 GameReplayer._display 各个事件分支。"""
+    def _make_replayer(self, tmp_path, events):
+        import json
+        path = tmp_path / "rec.json"
+        data = {
+            "version": "v1.3.2",
+            "players": ['你', '电脑A'],
+            "seasons": ['S1'],
+            "initial_top_card": '红5',
+            "events": events
+        }
+        path.write_text(json.dumps(data, ensure_ascii=False), encoding='utf-8')
+        ui = MagicMock()
+        return GameReplayer(str(path), ui), ui
+
+    def test_display_game_start(self, tmp_path):
+        r, ui = self._make_replayer(tmp_path, [
+            {'type': 'game_start', 'top_card': '红5'}
+        ])
+        r.next_event()
+        assert ui.show.called
+
+    def test_display_turn_start(self, tmp_path):
+        r, ui = self._make_replayer(tmp_path, [
+            {'type': 'turn_start', 'player': '你', 'hand_size': 7}
+        ])
+        r.next_event()
+        assert ui.show.called
+
+    def test_display_turn_start_without_hand_size(self, tmp_path):
+        r, ui = self._make_replayer(tmp_path, [
+            {'type': 'turn_start', 'player': '你'}
+        ])
+        r.next_event()
+        assert ui.show.called
+
+    def test_display_draw_card(self, tmp_path):
+        r, ui = self._make_replayer(tmp_path, [
+            {'type': 'draw_card', 'player': '你', 'card': '红5'}
+        ])
+        r.next_event()
+        assert ui.show.called
+
+    def test_display_play_card(self, tmp_path):
+        r, ui = self._make_replayer(tmp_path, [
+            {'type': 'play_card', 'player': '你', 'card': '红5'}
+        ])
+        r.next_event()
+        assert ui.show.called
+
+    def test_display_uno_call(self, tmp_path):
+        r, ui = self._make_replayer(tmp_path, [
+            {'type': 'uno_call', 'player': '你'}
+        ])
+        r.next_event()
+        assert ui.show.called
+
+    def test_display_skill_use(self, tmp_path):
+        r, ui = self._make_replayer(tmp_path, [
+            {'type': 'skill_use', 'player': '你', 'skill_name': '破万法'}
+        ])
+        r.next_event()
+        assert ui.show.called
+
+    def test_display_add_cards(self, tmp_path):
+        r, ui = self._make_replayer(tmp_path, [
+            {'type': 'add_cards', 'target': '电脑A', 'amount': 3}
+        ])
+        r.next_event()
+        assert ui.show.called
+
+    def test_display_player_eliminated(self, tmp_path):
+        r, ui = self._make_replayer(tmp_path, [
+            {'type': 'player_eliminated', 'player': '电脑A'}
+        ])
+        r.next_event()
+        assert ui.show.called
+
+    def test_display_game_end(self, tmp_path):
+        r, ui = self._make_replayer(tmp_path, [
+            {'type': 'game_end', 'winner': '你'}
+        ])
+        r.next_event()
+        assert ui.show.called
+
+    def test_display_unknown_event(self, tmp_path):
+        r, ui = self._make_replayer(tmp_path, [{'type': 'unknown_xyz'}])
+        r.next_event()
+        # 应打印"未知事件"
+        assert any('未知事件' in str(call) for call in ui.show.call_args_list)
+
+    def test_replay_all_stops_at_end(self, tmp_path):
+        r, ui = self._make_replayer(tmp_path, [
+            {'type': 'game_end', 'winner': '你'}
+        ])
+        with patch('builtins.input', return_value=''):
+            r.replay_all()
+        assert any('回放结束' in str(call) for call in ui.show.call_args_list)
+
+    def test_replay_all_multiple_events(self, tmp_path):
+        r, ui = self._make_replayer(tmp_path, [
+            {'type': 'turn_start', 'player': '你', 'hand_size': 7},
+            {'type': 'play_card', 'player': '你', 'card': '红5'},
+            {'type': 'game_end', 'winner': '你'},
+        ])
+        with patch('builtins.input', return_value=''):
+            r.replay_all()
+        # 至少调用了 3 次（3 个事件）+ 1 次"回放结束"
+        assert ui.show.call_count >= 4
+
+    def test_next_event_returns_none_at_end(self, tmp_path):
+        r, _ = self._make_replayer(tmp_path, [])
+        assert r.next_event() is None
+
+    def test_next_event_returns_event_and_advances(self, tmp_path):
+        r, _ = self._make_replayer(tmp_path, [
+            {'type': 'game_end', 'winner': '你'}
+        ])
+        ev1 = r.next_event()
+        assert ev1 is not None
+        ev2 = r.next_event()
+        assert ev2 is None
+
+
+class TestReplayRecorderSave:
+    """补 GameRecorder.save 到自定义目录的分支。"""
+
+    def test_recorder_save_creates_directory(self, tmp_path, monkeypatch):
+        import uno.replay as replay_module
+        nested = tmp_path / "a" / "b" / "records"
+        monkeypatch.setattr(replay_module, 'RECORDS_DIR', str(nested))
+        recorder = GameRecorder()
+        recorder.players = ['你']
+        recorder.seasons = ['S1']
+        recorder.initial_top_card = '红5'
+        path = recorder.save()
+        assert os.path.exists(path)
+        # 文件所在目录被创建
+        assert os.path.isdir(str(nested))
+        # 清理
+        os.remove(path)

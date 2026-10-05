@@ -3070,3 +3070,207 @@ class TestReplayRecorderSave:
         assert os.path.isdir(str(nested))
         # 清理
         os.remove(path)
+
+# ==================== 统计面板 ====================
+class TestStatsCollector:
+    @pytest.fixture(autouse=True)
+    def isolated_dirs(self, tmp_path, monkeypatch):
+        """把 records 和 archive 都指向临时目录。"""
+        import uno.archive as archive_module
+        import uno.replay as replay_module
+        import uno.stats as stats_module
+
+        fake_records = tmp_path / "records"
+        fake_records.mkdir()
+        fake_archive = tmp_path / "archive.txt"
+
+        monkeypatch.setattr(replay_module, 'RECORDS_DIR', str(fake_records))
+        monkeypatch.setattr(archive_module, 'ARCHIVE_FILE', str(fake_archive))
+
+        self.records_dir = fake_records
+        self.archive_file = fake_archive
+        self.archive_module = archive_module
+
+    def _make_replay(self, name, events):
+        import json
+        data = {
+            "version": "v1.3.3",
+            "players": ['你', '电脑A'],
+            "seasons": ['S1'],
+            "initial_top_card": '红5',
+            "events": events,
+        }
+        path = self.records_dir / name
+        path.write_text(json.dumps(data, ensure_ascii=False), encoding='utf-8')
+        return path
+
+    # ---------- 玩家 ----------
+    def test_player_stats_empty(self):
+        from uno.stats import StatsCollector
+        assert StatsCollector(records_dir=str(self.records_dir)).collect_player_stats() == []
+
+    def test_player_stats_sorted_by_rate(self):
+        from uno.stats import StatsCollector
+        self.archive_module.save_archive({
+            'A': {'wins': 5, 'losses': 5, 'achievements': []},
+            'B': {'wins': 9, 'losses': 1, 'achievements': ['一穿三']},
+            'C': {'wins': 0, 'losses': 0, 'achievements': []},
+        })
+        players = StatsCollector(records_dir=str(self.records_dir)).collect_player_stats()
+        assert players[0]['name'] == 'B'
+        assert players[0]['rate'] == 90.0
+        # 0 场次胜率为 0，排最后
+        assert players[-1]['name'] == 'C'
+
+    def test_player_stats_with_achievements(self):
+        from uno.stats import StatsCollector
+        self.archive_module.save_archive({
+            'A': {'wins': 1, 'losses': 0, 'achievements': ['反制大师']},
+        })
+        players = StatsCollector(records_dir=str(self.records_dir)).collect_player_stats()
+        assert players[0]['achievements'] == ['反制大师']
+
+    # ---------- 技能统计 ----------
+    def test_skill_stats_empty(self):
+        from uno.stats import StatsCollector
+        counter = StatsCollector(records_dir=str(self.records_dir)).collect_skill_stats()
+        assert len(counter) == 0
+
+    def test_skill_stats_counts_usage(self):
+        from uno.stats import StatsCollector
+        self._make_replay('replay_20260101_120000.json', [
+            {'type': 'skill_use', 'player': '你', 'skill_name': '破万法'},
+            {'type': 'skill_use', 'player': '电脑A', 'skill_name': '破万法'},
+            {'type': 'skill_use', 'player': '你', 'skill_name': '储能'},
+        ])
+        counter = StatsCollector(records_dir=str(self.records_dir)).collect_skill_stats()
+        assert counter['破万法'] == 2
+        assert counter['储能'] == 1
+
+    def test_skill_stats_ignores_corrupt(self):
+        from uno.stats import StatsCollector
+        (self.records_dir / 'replay_bad.json').write_text('not-json', encoding='utf-8')
+        self._make_replay('replay_20260101_120000.json', [
+            {'type': 'skill_use', 'player': '你', 'skill_name': '破万法'},
+        ])
+        counter = StatsCollector(records_dir=str(self.records_dir)).collect_skill_stats()
+        assert counter['破万法'] == 1
+
+    # ---------- 牌型统计 ----------
+    def test_card_stats_play_card(self):
+        from uno.stats import StatsCollector
+        self._make_replay('replay_20260101_120000.json', [
+            {'type': 'play_card', 'player': '你', 'card': '红5'},
+            {'type': 'play_card', 'player': '你', 'card': '红5'},
+            {'type': 'play_card', 'player': '电脑A', 'card': '蓝跳过'},
+        ])
+        counter = StatsCollector(records_dir=str(self.records_dir)).collect_card_stats()
+        assert counter['红5'] == 2
+        assert counter['蓝跳过'] == 1
+
+    def test_card_stats_add_cards(self):
+        from uno.stats import StatsCollector
+        self._make_replay('replay_20260101_120000.json', [
+            {'type': 'add_cards', 'target': '电脑A', 'amount': 2,
+             'cards': [['红', 3, None], ['蓝', None, '跳过']]},
+        ])
+        counter = StatsCollector(records_dir=str(self.records_dir)).collect_card_stats()
+        assert counter['红3'] == 1
+        assert counter['蓝跳过'] == 1
+
+    def test_card_stats_handles_malformed_info(self):
+        from uno.stats import StatsCollector
+        self._make_replay('replay_20260101_120000.json', [
+            {'type': 'add_cards', 'target': '电脑A', 'amount': 1,
+             'cards': [['红']]},   # 结构不完整
+        ])
+        # 不应崩溃
+        counter = StatsCollector(records_dir=str(self.records_dir)).collect_card_stats()
+        assert len(counter) == 0
+
+    # ---------- 对局统计 ----------
+    def test_game_stats_empty(self):
+        from uno.stats import StatsCollector
+        stats = StatsCollector(records_dir=str(self.records_dir)).collect_game_stats()
+        assert stats['total_games'] == 0
+        assert stats['avg_turns'] == 0.0
+
+    def test_game_stats_basic(self):
+        from uno.stats import StatsCollector
+        self._make_replay('replay_20260101_120000.json', [
+            {'type': 'turn_start', 'player': '你'},
+            {'type': 'turn_start', 'player': '电脑A'},
+            {'type': 'game_end', 'winner': '你'},
+        ])
+        self._make_replay('replay_20260102_120000.json', [
+            {'type': 'turn_start', 'player': '你'},
+            {'type': 'turn_start', 'player': '电脑A'},
+            {'type': 'turn_start', 'player': '你'},
+            {'type': 'turn_start', 'player': '电脑A'},
+            {'type': 'game_end', 'winner': '电脑A'},
+        ])
+        stats = StatsCollector(records_dir=str(self.records_dir)).collect_game_stats()
+        assert stats['total_games'] == 2
+        assert stats['total_turns'] == 6
+        assert stats['avg_turns'] == 3.0
+        assert stats['max_turns'] == 4
+        assert stats['min_turns'] == 2
+        assert stats['winners']['你'] == 1
+        assert stats['winners']['电脑A'] == 1
+
+
+class TestStatsPanel:
+    @pytest.fixture(autouse=True)
+    def isolated_dirs(self, tmp_path, monkeypatch):
+        import uno.archive as archive_module
+        import uno.replay as replay_module
+
+        fake_records = tmp_path / "records"
+        fake_records.mkdir()
+        fake_archive = tmp_path / "archive.txt"
+
+        monkeypatch.setattr(replay_module, 'RECORDS_DIR', str(fake_records))
+        monkeypatch.setattr(archive_module, 'ARCHIVE_FILE', str(fake_archive))
+
+        self.records_dir = fake_records
+        self.archive_module = archive_module
+
+    def test_show_all_empty_does_not_crash(self, capsys):
+        from uno.stats import StatsPanel
+        panel = StatsPanel(records_dir=str(self.records_dir))
+        panel.show_all()   # 无数据不应崩溃
+
+    def test_show_player_ranking_with_data(self, capsys):
+        from uno.stats import StatsPanel
+        self.archive_module.save_archive({
+            '你': {'wins': 3, 'losses': 1, 'achievements': ['一穿三']},
+        })
+        StatsPanel(records_dir=str(self.records_dir)).show_player_ranking()
+        out = capsys.readouterr().out
+        assert '你' in out
+        assert '3' in out
+
+    def test_show_skill_usage_with_data(self, capsys):
+        import json
+        from uno.stats import StatsPanel
+        path = self.records_dir / 'replay_20260101_120000.json'
+        path.write_text(json.dumps({
+            'players': ['你'], 'seasons': ['S1'],
+            'events': [{'type': 'skill_use', 'player': '你', 'skill_name': '破万法'}],
+        }), encoding='utf-8')
+        StatsPanel(records_dir=str(self.records_dir)).show_skill_usage()
+        out = capsys.readouterr().out
+        assert '破万法' in out
+
+    def test_fallback_show_no_rich(self, capsys, monkeypatch):
+        """无 rich 时降级显示。"""
+        import uno.stats as stats_module
+        from uno.stats import StatsPanel
+        monkeypatch.setattr(stats_module, '_try_rich', lambda: None)
+        self.archive_module.save_archive({
+            '你': {'wins': 1, 'losses': 0, 'achievements': []},
+        })
+        StatsPanel(records_dir=str(self.records_dir)).show_player_ranking()
+        out = capsys.readouterr().out
+        assert '玩家排行榜' in out
+        assert '你' in out

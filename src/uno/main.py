@@ -3,7 +3,7 @@ from uno.archive import show_record
 from uno.replay import GameRecorder, GameReplayer
 from uno.ui import ConsoleUI
 
-VERSION = "v1.4.0"
+VERSION = "v1.5.0"
 
 def main():
     print(f"欢迎来到 SkillUNO {VERSION}！")
@@ -100,6 +100,10 @@ def stats_panel():
     from uno.stats import StatsPanel
     StatsPanel().show_all()
 
+def mod_store():
+    """启动模组商店 CLI（阶段二仅预留入口，未挂到主菜单）。"""
+    from uno.mod_store import run_mod_store
+    run_mod_store()
 
 def cli():
     print(f"SkillUNO {VERSION}")

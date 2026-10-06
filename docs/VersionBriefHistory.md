@@ -2,7 +2,7 @@
 
 本文档记录 SkillUNO 从 v0.1.0 到当前版本的所有版本变更。
 ERROR 编号体系自 v1.3.1 起引入。
-完整的 API 说明请参阅 DEVELOPER_GUIDE.md。
+完整的 API 说明请参阅 docs/DEVELOPER_GUIDE.md。
 
 本文档按版本顺序（由新到旧）记录从 v0.1.0 到 v1.4.0 期间的所有修复内容。每个版本列出该版本修复的 bug、调整的功能及对应的错误编号。
 
@@ -40,7 +40,7 @@ ERROR 编号体系自 v1.3.1 起引入。
 
 ### 文档更新
 
-- `docs/HOW_TO_MAKE_A_MOD.md` 新增「模组元数据 JSON 格式」章节：
+- `mods/HOW_TO_MAKE_A_MOD.md` 新增「模组元数据 JSON 格式」章节：
   - 单模组 JSON 字段说明表（必填/可选、类型、说明）。
   - 空值写法（`{}` / `[]` / `null`）。
   - 索引文件 `mod_idx.json` 格式。
@@ -555,7 +555,7 @@ v0.4.0（2026-08-03）
 新增：mods/ 文件夹，支持 Mod 制作
 
 · 玩家可在 mods/ 下放置 .py 文件，定义自定义赛季。
-· 提供 HOW_TO_MAKE_A_MOD.md 指南。
+· 提供 mods/HOW_TO_MAKE_A_MOD.md 指南。
 
 ---
 

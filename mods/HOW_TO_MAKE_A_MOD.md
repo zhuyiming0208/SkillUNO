@@ -1,6 +1,6 @@
 ## 模组元数据 JSON 格式
 
-从 v1.3.4 起，SkillUNO CLI 模组商店通过 JSON 元数据发现、展示和索引你的模组。
+从 v1.4.0 起，SkillUNO CLI 模组商店通过 JSON 元数据发现、展示和索引你的模组。
 你需要在模组仓库根目录放一个 `skilluno_mod.json` 文件，并在 GitHub 仓库加上
 `skilluno-mod` topic，就能被自动收录。
 
@@ -12,7 +12,7 @@
 | `name` | ✅ | str | 显示名称，如 `"我的疯狂赛季"` |
 | `description` | ✅ | str | 一句话简介，展示在列表中 |
 | `author` | ✅ | str | 作者昵称 |
-| `author_github` | ❌ | str | GitHub 用户名，用于展示头像与主页 |
+| `author_github` | ✅ | str | GitHub 用户名，用于展示头像与主页 |
 | `repo` | ✅ | str | 仓库地址，如 `https://github.com/you/your-mod` |
 | `license` | ❌ | str | 许可证，如 `MIT`、`GPL-3.0` |
 | `version` | ✅ | str | 模组自身版本号，遵循 [SemVer](https://semver.org/lang/zh-CN/) |

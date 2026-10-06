@@ -3,8 +3,8 @@
 **版本：v1.4.0**  
 **最后更新：2026-10-06**
 
-本文档面向希望为 SkillUNO 编写 Mod、自定义 UI 或扩展游戏核心的开发者。如果你是玩家，请先阅读 `FAQ.md`。  
-如需查看历史修复记录，请参阅 `VersionBriefHistory.md`。
+本文档面向希望为 SkillUNO 编写 Mod、自定义 UI 或扩展游戏核心的开发者。如果你是玩家，请先阅读 `docs/FAQ.md`。  
+如需查看历史修复记录，请参阅 `docs/VersionBriefHistory.md`。
 
 ---
 

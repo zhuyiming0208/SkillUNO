@@ -18,6 +18,7 @@ REQUIRED_FIELDS = [
     "name",
     "description",
     "author",
+    "author_github",
     "repo",
     "version",
     "micover",
@@ -30,6 +31,7 @@ OFFICIAL_MODS = [
     {"id": "S1", "name": "经典赛季", "skills": 16, "builtin": True},
     {"id": "S2", "name": "被动觉醒", "skills": 8, "builtin": True},
     {"id": "S4", "name": "补丁赛季", "skills": 8, "builtin": True},
+    {"id": "S3", "name": "同盟赛季", "skills": 0, "builtin": True},
 ]
 
 # 索引文件缺省值

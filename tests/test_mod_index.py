@@ -61,6 +61,14 @@ class TestLoadMod:
         for field in REQUIRED_FIELDS:
             assert field in mod
 
+    def test_load_example_has_author_github(self, real_mods_dir):
+        """example.json 中 author_github 字段存在且非空。"""
+        idx = ModIndex(mods_dir=real_mods_dir)
+        mod = idx.load_mod("example.json")
+        assert mod is not None
+        assert "author_github" in mod
+        assert mod["author_github"]  # 非空字符串
+
     def test_load_nonexistent_returns_none(self, real_mods_dir, capsys):
         idx = ModIndex(mods_dir=real_mods_dir)
         result = idx.load_mod("does_not_exist.json")
@@ -77,6 +85,21 @@ class TestLoadMod:
         captured = capsys.readouterr()
         assert "缺少必填字段" in captured.out
 
+    def test_load_mod_missing_author_github_returns_none(self, tmp_path, capsys):
+        """缺失 author_github 的模组应被跳过，并打印含该字段名的警告。"""
+        bad = tmp_path / "no_github.json"
+        bad.write_text(json.dumps({
+            "ID": "NOGH", "name": "n", "description": "d", "author": "a",
+            # 故意缺 author_github
+            "repo": "r", "version": "1.0.0", "micover": "1.0.0",
+            "lacover": None, "skills": 1,
+        }, ensure_ascii=False), encoding="utf-8")
+        idx = ModIndex(mods_dir=str(tmp_path))
+        result = idx.load_mod("no_github.json")
+        assert result is None
+        captured = capsys.readouterr()
+        assert "author_github" in captured.out
+
     def test_load_mod_bad_json_returns_none(self, tmp_path, capsys):
         bad = tmp_path / "bad.json"
         bad.write_text("not-json", encoding="utf-8")
@@ -90,8 +113,8 @@ class TestLoadMod:
         """构造一个合规的最小模组，确认加载成功。"""
         full = {
             "ID": "OK", "name": "OK", "description": "d", "author": "a",
-            "repo": "r", "version": "1.0.0", "micover": "1.0.0",
-            "lacover": None, "skills": 1,
+            "author_github": "a_gh", "repo": "r", "version": "1.0.0",
+            "micover": "1.0.0", "lacover": None, "skills": 1,
         }
         (tmp_path / "ok.json").write_text(
             json.dumps(full, ensure_ascii=False), encoding="utf-8"
@@ -119,7 +142,8 @@ class TestListAndSearch:
         (tmp_path / filename).write_text(
             json.dumps({
                 "ID": mod_id, "name": name, "description": "d",
-                "author": author, "repo": "r", "version": "1.0.0",
+                "author": author, "author_github": author,
+                "repo": "r", "version": "1.0.0",
                 "micover": "1.0.0", "lacover": None, "skills": 1,
             }, ensure_ascii=False),
             encoding="utf-8",

@@ -4,9 +4,63 @@
 ERROR 编号体系自 v1.3.1 起引入。
 完整的 API 说明请参阅 DEVELOPER_GUIDE.md。
 
-本文档按版本顺序（由新到旧）记录从 v0.1.0 到 v1.3.3 期间的所有修复内容。每个版本列出该版本修复的 bug、调整的功能及对应的错误编号。
+本文档按版本顺序（由新到旧）记录从 v0.1.0 到 v1.4.0 期间的所有修复内容。每个版本列出该版本修复的 bug、调整的功能及对应的错误编号。
 
-> **当前版本：v1.3.3**（2026-10-05）
+> **当前版本：v1.4.0**（2026-10-06）
+
+---
+## v1.4.0（2026-10-06）
+
+本版本为**功能扩展版本**，聚焦模组生态与数据可视化。
+
+### 新增：模组索引系统
+
+- 新增 `src/uno/mod_index.py`：
+  - `ModIndex` 类，读取 `mods/mod_idx.json` 索引与各模组元数据 JSON。
+  - 支持 `load_index` / `load_mod` / `get_handpicked` / `get_all` / `search` / `get_official`。
+  - 必填字段校验（`ID`、`name`、`description`、`author`、`repo`、`version`、`micover`、`lacover`、`skills`），缺失时打印中文警告并跳过。
+  - `OFFICIAL_MODS` 常量硬编码 S1/S2/S4 三个官方赛季。
+  - `get_official()` 返回深拷贝，防止外部修改污染常量。
+- 新增 `mods/mod_idx.json`：模组索引文件，初始为空。
+- 新增 `mods/example.json`：模组元数据模板（仅供作者参考，不参与索引）。
+- 支持带/不带 BOM 的 UTF-8 编码（`utf-8-sig`）。
+
+### 新增：统计面板
+
+- 新增 `src/uno/stats.py`：
+  - `StatsCollector`：聚合 `archive.txt`（玩家胜率、成就）与 `records/*.json`（技能使用、牌型频率、回合数、胜者分布）。
+  - `StatsPanel`：基于 `rich` 的富文本渲染（表格 + 面板），无 `rich` 时自动降级为纯文本。
+  - 支持 `show_all` / `show_player_ranking` / `show_skill_usage` / `show_card_stats` / `show_game_stats`。
+
+### 新增：CLI 入口
+
+- `src/uno/main.py` 新增 `cli()` 函数，注册为 `skilluno` console script 入口。
+- 主菜单新增「3. 统计面板」选项。
+- 通过 `pyproject.toml` 的 `[project.scripts]` 暴露为全局命令。
+
+### 文档更新
+
+- `docs/HOW_TO_MAKE_A_MOD.md` 新增「模组元数据 JSON 格式」章节：
+  - 单模组 JSON 字段说明表（必填/可选、类型、说明）。
+  - 空值写法（`{}` / `[]` / `null`）。
+  - 索引文件 `mod_idx.json` 格式。
+  - 自动发现机制（GitHub topic `skilluno-mod` + 仓库根目录 `skilluno_mod.json`）。
+  - 第三方模组安全声明。
+
+### 测试
+
+- 新增 `tests/test_mod_index.py`（21 个测试）：
+  - 索引读取（成功 / 缺失 / 损坏）。
+  - 模组读取（成功 / 缺失 / 缺必填字段 / 损坏）。
+  - 列表合并（`handpicked` + `other`）。
+  - 搜索（ID 大小写、作者、名称、无匹配、空关键词、空索引）。
+  - 官方模组（数量 / ID / 深拷贝）。
+- 现有测试保持通过。
+
+### 版本统计
+
+- 测试总数：**328 → 347**
+- 总体覆盖率：**81%**
 
 ---
 
@@ -590,7 +644,7 @@ v0.1.0（2026-07-26）
 后续版本计划
 
 编号 描述 计划版本
-TODO-001 成就按玩家分别评估（热座模式） v1.4.0
+TODO-001 成就按玩家分别评估（热座模式） v1.4.0+
 TODO-002 AI 战术增强（考虑对手手牌数、技能状态） v1.4.0+
 TODO-003 统计面板 v1.5.0
 TODO-004 随机赛季 待定
@@ -617,11 +671,12 @@ TODO-006 联机模式 待定
 运行方式：
 
 ```bash
-python -m unittest tests.test_all
+python -m unittest tests.test_1_3_3
+python -m unittest tests.test_mod_index
 ```
 
-预期输出：Ran 30 tests in ... OK。
+预期输出：Ran xxx tests in ... OK。
 
 ---
 
-最后更新：2026-10-05 · v1.3.3
+最后更新：2026-10-06 · v1.4.0

@@ -249,10 +249,11 @@ Q29: 如何运行测试？
 在项目根目录（src/）下执行：
 
 ```bash
-python -m unittest tests.test_all
+python -m unittest tests.test_1_3_3
+python -m unittest tests.test_mod_index
 ```
 
-应输出 Ran 30 tests ... OK。
+应输出 Ran xxx tests ... OK。
 
 Q30: 测试失败怎么办？
 

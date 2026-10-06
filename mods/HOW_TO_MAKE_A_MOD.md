@@ -1,3 +1,75 @@
+## 模组元数据 JSON 格式
+
+从 v1.3.4 起，SkillUNO CLI 模组商店通过 JSON 元数据发现、展示和索引你的模组。
+你需要在模组仓库根目录放一个 `skilluno_mod.json` 文件，并在 GitHub 仓库加上
+`skilluno-mod` topic，就能被自动收录。
+
+### 单模组 JSON（`skilluno_mod.json`）
+
+| 字段 | 必填 | 类型 | 说明 |
+|------|:---:|------|------|
+| `ID` | ✅ | str | 全局唯一标识，推荐大写字母与数字，如 `MY_MOD` |
+| `name` | ✅ | str | 显示名称，如 `"我的疯狂赛季"` |
+| `description` | ✅ | str | 一句话简介，展示在列表中 |
+| `author` | ✅ | str | 作者昵称 |
+| `author_github` | ❌ | str | GitHub 用户名，用于展示头像与主页 |
+| `repo` | ✅ | str | 仓库地址，如 `https://github.com/you/your-mod` |
+| `license` | ❌ | str | 许可证，如 `MIT`、`GPL-3.0` |
+| `version` | ✅ | str | 模组自身版本号，遵循 [SemVer](https://semver.org/lang/zh-CN/) |
+| `micover` | ✅ | str | 最低兼容的 SkillUNO 版本 |
+| `lacover` | ✅ | str \| null | 最高兼容版本；`null` 表示不限 |
+| `skills` | ✅ | int | 本模组包含的技能数量 |
+| `achievements` | ❌ | int | 本模组包含的成就数量 |
+| `needs` | ❌ | list[str] | 需要的接口列表，如 `["core.Skill"]` |
+| `rely_on` | ❌ | dict | 依赖声明，格式见下 |
+| `reject` | ❌ | dict | 排斥声明，格式见下 |
+| `only_tolerate` | ❌ | list[str] | 白名单，仅允许与这些赛季共存 |
+| `tags` | ❌ | list[str] | 标签，用于分类检索 |
+| `created_at` | ❌ | str | 创建日期，`YYYY-MM-DD` |
+| `updated_at` | ❌ | str | 更新日期，`YYYY-MM-DD` |
+
+### 空值写法
+
+| 类型 | 空值 |
+|------|------|
+| 字典 | `{}` |
+| 列表 | `[]` |
+| 无值 | `null` |
+
+> ⚠️ 不要用空字符串 `""` 代替 `null`，会导致解析歧义。
+
+### 索引文件 `mods/mod_idx.json`
+
+CLI 商店读取的本地索引，由 GitHub Action 自动维护：
+
+```json
+{
+  "handpicked": ["example.json"],
+  "other": ["another_mod.json"],
+  "version": "1.0.0",
+  "update_time": "2026-10-06"
+}
+
+· handpicked：官方精选的模组元数据文件名列表
+· other：其余收录的模组元数据文件名列表
+· version：索引格式版本
+· update_time：最近一次更新时间
+
+自动发现机制
+
+如果你希望模组被官方索引自动收录：
+
+1. 在模组仓库根目录放 skilluno_mod.json（字段见上表）
+2. 给仓库添加 GitHub topic：skilluno-mod
+3. 提交到官方索引 PR，或等待 GitHub Action 定期抓取
+
+安全声明
+
+⚠️ 第三方模组由社区作者提供，SkillUNO 官方不对其内容负责。
+下载和安装前，请确认来源可信、代码可审计。若发现恶意行为，请提交 Issue。
+
+---
+
 # SkillUNO 玩家自制赛季指南
 
 欢迎制作你自己的 SkillUNO 赛季！只要遵循以下规范，你的赛季就能被游戏自动加载，并与官方赛季、其他 Mod 共存。

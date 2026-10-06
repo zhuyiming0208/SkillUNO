@@ -1,0 +1,21 @@
+{
+  "ID": "EXAMPLE",
+  "name": "示例模组",
+  "description": "这是一个示例模组元数据文件，用于测试索引加载与解析，不参与实际游戏。",
+  "author": "example_author",
+  "author_github": "example_author",
+  "repo": "sample_URL",
+  "license": "MIT",
+  "version": "1.0.0",
+  "micover": "1.0.0",
+  "lacover": null,
+  "skills": 3,
+  "achievements": 0,
+  "needs": ["core.Skill"],
+  "rely_on": {},
+  "reject": {},
+  "only_tolerate": [],
+  "tags": ["示例"],
+  "created_at": "2026-10-06",
+  "updated_at": "2026-10-06"
+}

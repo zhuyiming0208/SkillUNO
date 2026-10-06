@@ -1,7 +1,7 @@
 # SkillUNO 开发者文档
 
-**版本：v1.3.3**  
-**最后更新：2026-09-12**
+**版本：v1.4.0**  
+**最后更新：2026-10-06**
 
 本文档面向希望为 SkillUNO 编写 Mod、自定义 UI 或扩展游戏核心的开发者。如果你是玩家，请先阅读 `FAQ.md`。  
 如需查看历史修复记录，请参阅 `VersionBriefHistory.md`。
@@ -12,7 +12,7 @@
 
 SkillUNO 是一个基于 Python 的 UNO 卡牌游戏框架，核心设计理念是 **事件驱动 + Mod 化**。所有技能、赛季、甚至 UI 都可以通过简单的 Python 类进行扩展，无需修改核心引擎。
 
-当前稳定版本：**v1.3.3**
+当前稳定版本：**v1.4.0**
 
 ---
 
@@ -20,35 +20,48 @@ SkillUNO 是一个基于 Python 的 UNO 卡牌游戏框架，核心设计理念�
 
 ```
 
-src/
-├── tests/
-│   ├── init.py
-│   └── test_all.py             # 完整单元测试套件
-├── uno/
-│   ├── records/                # 对局回放目录
-│   │   └── replay_*.json
-│   ├── core.py                 # 游戏引擎（核心）
-│   ├── skills_uno.py           # 技能加载器（依赖/排斥/容忍）
-│   ├── ui.py                   # UI 抽象层（ConsoleUI / NullUI / RichUI）
-│   ├── combo_base.py           # 组合技基类
-│   ├── achievements.py         # 成就系统（含隐藏成就）
-│   ├── archive.py              # 战绩存档
-│   ├── presets.py              # 房间规则预设
-│   ├── replay.py               # 录制与回放
-│   ├── season1.py              # 经典赛季 S1
-│   ├── season2.py              # 被动觉醒赛季 S2
-│   ├── season3.py              # 同盟赛季 S3（预留）
-│   ├── season4.py              # 补丁赛季 S4
-│   ├── archive.txt             # Base64 加密的存档
-│   └── init.py
-├── mods/                       # 玩家自制 Mod 目录
-│   ├── HOW_TO_MAKE_A_MOD.md
-│   └── init.py
-├── main.py                     # 入口
-├── FAQ.md
-├── DEVELOPER_GUIDE.md          # 本文档
-├── VersionBriefHistory.md      # 版本修复历史
-└── how_to_go_from_a_beginner_to_an_expert.md
+SkillUNO
+├── LICENSE
+├── README.md
+├── docs
+│   ├── DEVELOPER_GUIDE.md
+│   ├── FAQ.md
+│   ├── VersionBriefHistory.md
+│   ├── how_to_go_from_a_beginner_to_an_expert.md
+│   └── screenshots
+│       ├── gameplay1.jpg
+│       └── gameplay2.jpg
+├── mods
+│   ├── HOW_TO_MAKE_A_MOD.md
+│   ├── __init__.py
+│   ├── example.json
+│   └── mod_idx.json
+├── pyproject.toml
+├── src
+│   ├── __init__.py
+│   └── uno
+│       ├── __init__.py
+│       ├── achievements.py
+│       ├── archive.py
+│       ├── archive.txt
+│       ├── combo_base.py
+│       ├── core.py
+│       ├── main.py
+│       ├── mod_index.py
+│       ├── presets.json
+│       ├── presets.py
+│       ├── replay.py
+│       ├── season1.py
+│       ├── season2.py
+│       ├── season3.py
+│       ├── season4.py
+│       ├── skills_uno.py
+│       ├── stats.py
+│       └── ui.py
+└── tests
+    ├── __init__.py
+    ├── test_1_3_3.py
+    └── test_mod_index.py
 
 ```
 

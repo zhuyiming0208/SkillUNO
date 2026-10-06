@@ -1,9 +1,9 @@
-﻿from uno.core import UNOGame
+from uno.core import UNOGame
 from uno.archive import show_record
 from uno.replay import GameRecorder, GameReplayer
 from uno.ui import ConsoleUI
 
-VERSION = "v1.3.3"
+VERSION = "v1.4.0"
 
 def main():
     print(f"欢迎来到 SkillUNO {VERSION}！")

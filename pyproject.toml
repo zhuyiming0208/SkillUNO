@@ -1,6 +1,6 @@
 [project]
 name = "skilluno"
-version = "1.3.3"
+version = "1.4.0"
 description = "一个基于 Python 的 UNO 卡牌游戏框架"
 readme = "README.md"
 requires-python = ">=3.8"

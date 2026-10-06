@@ -226,15 +226,21 @@ class TestListAndSearch:
 
 # ---------- 官方模组 ----------
 class TestOfficialMods:
-    def test_get_official_returns_three(self, real_mods_dir):
+    def test_get_official_returns_four(self, real_mods_dir):
         idx = ModIndex(mods_dir=real_mods_dir)
         mods = idx.get_official()
-        assert len(mods) == 3
+        assert len(mods) == 4
 
     def test_get_official_ids(self, real_mods_dir):
         idx = ModIndex(mods_dir=real_mods_dir)
         ids = {m["id"] for m in idx.get_official()}
-        assert ids == {"S1", "S2", "S4"}
+        assert ids == {"S1", "S2", "S3", "S4"}
+
+    def test_get_official_all_builtin(self, real_mods_dir):
+        """所有官方模组都带 builtin 标记。"""
+        idx = ModIndex(mods_dir=real_mods_dir)
+        for mod in idx.get_official():
+            assert mod.get("builtin") is True
 
     def test_get_official_returns_copy(self, real_mods_dir):
         """修改返回值不应污染 OFFICIAL_MODS。"""

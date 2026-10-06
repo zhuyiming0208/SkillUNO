@@ -19,10 +19,21 @@ pip install rich
 
 Q2: 如何启动游戏？
 
-在项目根目录（含 main.py 的目录）下执行：
+推荐方式一（安装为可执行命令）：
 
 ```bash
-python main.py
+cd SkillUNO
+pip install -e .
+skilluno
+```
+
+安装后可在任意目录直接运行 skilluno。
+
+方式二（不安装）：
+
+```bash
+cd SkillUNO
+PYTHONPATH=src python -m uno.main
 ```
 
 Q3: 为什么我导入 ui 报错 ModuleNotFoundError？
@@ -72,11 +83,11 @@ Q8: 单人模式和热座模式有什么区别？
 
 Q9: 如何回放之前的对局？
 
-选择主菜单的 2. 回放录像，会列出 uno/records/ 目录下的所有录像文件。选择任意一场，逐帧播放。若输入路径为空，默认加载 uno/record.json。
+选择主菜单的 2. 回放录像，会列出 src/uno/records/ 目录下的所有录像文件。选择任意一场，逐帧播放。直接回车 = 选择最新的录像。
 
 Q10: 录制功能怎么开启？
 
-在新游戏流程中，会询问“是否录制本局游戏？” 选 y。游戏结束后录像会自动保存到 uno/records/replay_YYYYMMDD_HHMMSS.json。
+在新游戏流程中，会询问“是否录制本局游戏？” 选 y。游戏结束后录像会自动保存到 src/uno/records/replay_YYYYMMDD_HHMMSS.json。
 
 ---
 
@@ -150,7 +161,7 @@ ACHIEVEMENTS = [MyAchievement]
 
 Q16: 我的战绩存在哪里？
 
-存档文件为 uno/archive.txt，采用 Base64 编码的 JSON，防止直接修改。
+存档文件为 src/uno/archive.txt，采用 Base64 编码的 JSON，防止直接修改。
 
 Q17: 如何手动修改战绩？
 
@@ -162,7 +173,7 @@ data = {"你的名字": {"wins": 10, "losses": 2, "achievements": []}}
 print(base64.b64encode(json.dumps(data, ensure_ascii=False).encode('utf-8')).decode('ascii'))
 ```
 
-把输出写入 archive.txt 即可。
+把输出写入 src/uno/archive.txt 即可。
 
 Q18: 有哪些成就？
 
@@ -246,14 +257,20 @@ Q28: 鹰眼/读心/显灵泄露了信息？
 
 Q29: 如何运行测试？
 
-在项目根目录（src/）下执行：
+在项目根目录（SkillUNO/）下执行：
 
 ```bash
-python -m unittest tests.test_1_3_3
-python -m unittest tests.test_mod_index
+python -m pytest tests/
 ```
 
-应输出 Ran xxx tests ... OK。
+或单独跑某个文件：
+
+```bash
+python -m pytest tests/test_1_3_3.py -v
+python -m pytest tests/test_mod_index.py -v
+```
+
+应输出类似 xxx passed in X.XXs。
 
 Q30: 测试失败怎么办？
 
@@ -283,7 +300,9 @@ Q33: 如何添加新的技能而不改核心代码？
 
 Q34: 我可以把 SkillUNO 分享给朋友吗？
 
-可以，直接打包整个项目目录，确保 uno/、main.py、mods/ 完整即可。存档和录像会随游戏目录一起保存。
+可以，直接把项目的 GitHub 仓库地址发给朋友即可。对方通过 git clone 或下载 ZIP 后，按 Q2 的方式安装运行。
+
+存档和录像保存在各自的本地目录，不会互相同步。
 
 ---
 

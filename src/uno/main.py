@@ -106,22 +106,29 @@ def mod_store():
     run_mod_store()
 
 def cli():
-    print(f"SkillUNO {VERSION}")
-    action = input(
-        "1. 新游戏\n"
-        "2. 回放录像\n"
-        "3. 统计面板\n"
-        "4. 模组商店\n"
-        "请选择: "
-    ).strip()
-    if action == '2':
-        replay()
-    elif action == '3':
-        stats_panel()
-    elif action == '4':
-        mod_store()
-    else:
-        main()
+    while True:
+        print(f"\nSkillUNO {VERSION}")
+        action = input(
+            "1. 新游戏\n"
+            "2. 回放录像\n"
+            "3. 统计面板\n"
+            "4. 模组商店\n"
+            "0. 退出\n"
+            "请选择: "
+        ).strip()
+        if action in ('0', 'q'):
+            print("再见！")
+            break
+        elif action == '1':
+            main()
+        elif action == '2':
+            replay()
+        elif action == '3':
+            stats_panel()
+        elif action == '4':
+            mod_store()
+        # 其他输入 → 回到菜单
+
 
 if __name__ == "__main__":
     cli()

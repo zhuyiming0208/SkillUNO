@@ -38,8 +38,7 @@ class Router:
                 clear_screen()
                 print(page.render())
 
-                raw = page.wants_raw_input() if hasattr(page, 'wants_raw_input') else False
-                event = ih.read_key(raw_input=raw)
+                event = ih.read_key()
                 if event is None:
                     # 非 TTY 或读键失败，退出
                     break

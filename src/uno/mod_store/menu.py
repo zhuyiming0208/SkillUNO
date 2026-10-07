@@ -9,7 +9,7 @@ from uno.mod_store.render import (
 class MainMenu:
     """主菜单：官方模组区 + 精选模组区 + 操作栏。"""
 
-    MAX_HANDPICKED_DISPLAY = 8
+    MAX_HANDPICKED_DISPLAY = 12
     BOX_WIDTH = 60
 
     def __init__(self, mod_index):
@@ -18,16 +18,23 @@ class MainMenu:
         self.handpicked = mod_index.get_handpicked()
         self.selected = 0
 
-        displayed = min(len(self.handpicked), self.MAX_HANDPICKED_DISPLAY)
-        self.total_items = len(self.official) + displayed
+        # 超过 12 个精选模组时，打印警告，只保留前 12 个
+        if len(self.handpicked) > self.MAX_HANDPICKED_DISPLAY:
+            print(
+                f"警告：精选模组超过 {self.MAX_HANDPICKED_DISPLAY} 个"
+                f"（当前 {len(self.handpicked)} 个），"
+                f"只显示前 {self.MAX_HANDPICKED_DISPLAY} 个。"
+            )
+            self.handpicked = self.handpicked[:self.MAX_HANDPICKED_DISPLAY]
+
+        self.total_items = len(self.official) + len(self.handpicked)
         if self.total_items == 0:
-            self.total_items = 1  # 至少允许一个"选中"
+            self.total_items = 1
 
     # ---------- 渲染 ----------
     def render(self) -> str:
         lines = []
 
-        # 标题
         title = "SkillUNO 模组商店"
         lines.append(colorize(pad_text(title, self.BOX_WIDTH, "center"), "bright_cyan"))
         lines.append("")
@@ -43,17 +50,13 @@ class MainMenu:
 
         # 精选模组区
         lines.append(colorize("【精选模组】", "bright_yellow"))
-        displayed = self.handpicked[:self.MAX_HANDPICKED_DISPLAY]
-        if not displayed:
-            lines.append("  （暂无精选模组）")
+        if not self.handpicked:
+            lines.append("  暂无精选模组")
         else:
             base = len(self.official)
-            for i, mod in enumerate(displayed):
+            for i, mod in enumerate(self.handpicked):
                 real_idx = base + i
                 lines.append(self._render_mod_item(real_idx, mod))
-            extra = len(self.handpicked) - len(displayed)
-            if extra > 0:
-                lines.append(colorize(f"  还有 {extra} 个，按 S 搜索", "dim"))
         lines.append("")
 
         # 操作栏
@@ -98,7 +101,19 @@ class MainMenu:
         if key.type == ih.EventType.HELP:
             return Action.HELP
         if key.type == ih.EventType.ENTER:
-            return Action.DETAIL
+            mod = self.current_mod()
+            if mod is None:
+                return None
+            return (Action.DETAIL, mod)
         if key.type == ih.EventType.BACK:
-            return Action.QUIT  # 主菜单按 BACK 直接退出
+            return Action.QUIT
+        return None
+
+    def current_mod(self):
+        """返回当前选中项的模组数据。"""
+        if self.selected < len(self.official):
+            return self.official[self.selected]
+        idx = self.selected - len(self.official)
+        if 0 <= idx < len(self.handpicked):
+            return self.handpicked[idx]
         return None

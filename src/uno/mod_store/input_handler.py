@@ -14,10 +14,16 @@
     q  → QUIT
     ~  → BACK（代替 ESC）
     x  → DELETE（阶段三预留）
+    \\x7f / \\x08 → BACKSPACE
 
 【确认键有多种写法】
 回车（\\r、\\n）、空格、字母 e 都视为 ENTER，
 兼容软键盘（回车发送 \\r，软键盘备用 'e'）。
+
+【UTF-8 多字节字符】
+Termux 的中文输入发送 3 字节 UTF-8 序列（如 "示" → e7 a4 ba）。
+read_key() 根据首字节判断 UTF-8 长度，自动补读后续字节，
+返回完整的 KeyEvent(CHAR, "示")。
 
 【非 TTY 环境】
 CI（GitHub Actions）里 sys.stdin 不是终端，termios.tcgetattr()
@@ -53,6 +59,7 @@ class EventType:
     SEARCH = "SEARCH"
     HELP = "HELP"
     DELETE = "DELETE"
+    BACKSPACE = "BACKSPACE"
     CHAR = "CHAR"
     UNKNOWN = "UNKNOWN"
 
@@ -75,41 +82,71 @@ class KeyEvent:
 
 # ---------- 读取 ----------
 def read_key() -> Optional[KeyEvent]:
-    """读取单个按键。
-
-    - 非 TTY 环境返回 None
-    - Ctrl+C 抛 KeyboardInterrupt
-    - 其他异常返回 None（保护 CI）
-    """
+    """读取单个按键（含 UTF-8 多字节字符）。"""
     try:
-        if os.name == 'nt':
-            ch = _read_win()
-        else:
-            ch = _read_unix()
+        first = _read_bytes()
     except KeyboardInterrupt:
         raise
     except Exception:
         return None
 
-    if ch is None or ch == '':
+    if first is None:
         return None
 
-    # Ctrl+C
-    if ch == '\x03':
+    # Ctrl+C 在 raw 模式下不触发 KeyboardInterrupt，需要显式判断
+    if first == b'\x03':
         raise KeyboardInterrupt()
+
+    # 根据首字节判断 UTF-8 总长度
+    b0 = first[0]
+    if b0 < 0x80:
+        total = 1
+    elif (b0 & 0xE0) == 0xC0:
+        total = 2
+    elif (b0 & 0xF0) == 0xE0:
+        total = 3
+    elif (b0 & 0xF8) == 0xF0:
+        total = 4
+    else:
+        total = 1  # 非法起始字节，当单字节处理
+
+    buf = first
+    while len(buf) < total:
+        try:
+            more = _read_bytes()
+        except Exception:
+            break
+        if more is None:
+            break
+        buf += more
+
+    try:
+        ch = buf.decode('utf-8')
+    except UnicodeDecodeError:
+        ch = buf.decode('utf-8', errors='replace')
 
     return _map_char(ch)
 
 
-def _read_win() -> Optional[str]:
+def _read_bytes() -> Optional[bytes]:
+    """读一个字节。"""
+    if os.name == 'nt':
+        return _read_win_bytes()
+    return _read_unix_bytes()
+
+
+def _read_win_bytes() -> Optional[bytes]:
     try:
         import msvcrt
-        return msvcrt.getwch()
+        ch = msvcrt.getwch()
+        if not ch:
+            return None
+        return ch.encode('utf-8')
     except Exception:
         return None
 
 
-def _read_unix() -> Optional[str]:
+def _read_unix_bytes() -> Optional[bytes]:
     import tty
     import termios
 
@@ -118,27 +155,31 @@ def _read_unix() -> Optional[str]:
             return None
         fd = sys.stdin.fileno()
         old_settings = termios.tcgetattr(fd)
-    except (termios.error, OSError, ValueError):
+    except (termios.error, OSError, ValueError, AttributeError):
         return None
 
     try:
         tty.setraw(fd)
-        ch = sys.stdin.read(1)
+        data = os.read(fd, 1)
     finally:
         # 必须恢复终端状态，防止崩溃后卡在 raw 模式
         try:
             termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
         except Exception:
             pass
-    return ch
+
+    return data if data else None
 
 
 def _map_char(ch: str) -> KeyEvent:
     """字符 → KeyEvent。字母统一小写化后再匹配。"""
     lowered = ch.lower()
 
-    # 确认键（先判断，避免 'e' 与字母键冲突）
-    # lowered 处理过大小写，所以 'E' 也能识别为 ENTER
+    # 退格（先判断）
+    if ch in ('\x7f', '\x08'):
+        return KeyEvent(EventType.BACKSPACE)
+
+    # 确认键（'e' 与字母键冲突，先判断）
     if lowered in KEY_CONFIRM_CHARS:
         return KeyEvent(EventType.ENTER, ch)
 

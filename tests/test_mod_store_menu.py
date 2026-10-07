@@ -117,7 +117,13 @@ class TestMenuActions:
         assert _make_menu().handle_key(ih.KeyEvent(ih.EventType.HELP)) == Action.HELP
 
     def test_enter_returns_detail(self):
-        assert _make_menu().handle_key(ih.KeyEvent(ih.EventType.ENTER)) == Action.DETAIL
+        result = _make_menu().handle_key(ih.KeyEvent(ih.EventType.ENTER))
+        # 阶段三：返回 (Action.DETAIL, mod_data) 元组
+        assert isinstance(result, tuple)
+        action, payload = result
+        assert action == Action.DETAIL
+        assert payload is not None
+        assert payload.get("id") == "S1" or payload.get("ID") == "S1"
 
     def test_back_returns_quit_on_main_menu(self):
         assert _make_menu().handle_key(ih.KeyEvent(ih.EventType.BACK)) == Action.QUIT
@@ -132,18 +138,17 @@ class TestPagination:
             for i in range(n)
         ]
 
-    def test_more_than_8_handpicked_shows_hint(self):
-        menu = MainMenu(FakeModIndex(handpicked=self._make_many(12)))
+    def test_more_than_12_handpicked_shows_warning(self, capsys):
+        menu = MainMenu(FakeModIndex(handpicked=self._make_many(15)))
         text = menu.render()
         assert "模组0" in text
-        assert "模组7" in text
-        assert "模组8" not in text  # 第 9 个不显示
-        assert "还有 4 个" in text
+        assert "模组11" in text
+        assert "模组12" not in text
 
     def test_total_items_capped(self):
-        menu = MainMenu(FakeModIndex(handpicked=self._make_many(12)))
-        # 3 官方 + 8 精选 = 11
-        assert menu.total_items == 11
+        """3 官方 + 12 精选 = 15。"""
+        menu = MainMenu(FakeModIndex(handpicked=self._make_many(20)))
+        assert menu.total_items == 15
 
 
 # ---------- input_handler ----------
@@ -177,4 +182,5 @@ class TestInputHandler:
         with patch('sys.stdin') as mock_stdin:
             mock_stdin.isatty.return_value = False
             # 清掉 msvcrt 分支，强制走 unix 分支
+            assert ih.read_key() is None
             assert ih.read_key() is None

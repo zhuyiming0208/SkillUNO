@@ -125,8 +125,11 @@ class ModIndex:
         return result
 
     # ---------- 搜索 ----------
-    def search(self, keyword: str) -> List[Dict]:
-        """在 ID / 名称 / 作者中模糊匹配关键词。"""
+    def search(self, keyword: str, limit: Optional[int] = None) -> List[Dict]:
+        """在 ID / name / author / author_github / tags 中模糊匹配关键词。
+
+        limit 不为 None 时，返回结果最多 limit 条。
+        """
         keyword = (keyword or "").strip().lower()
         if not keyword:
             return []
@@ -136,9 +139,15 @@ class ModIndex:
                 str(mod.get("ID", "")).lower(),
                 str(mod.get("name", "")).lower(),
                 str(mod.get("author", "")).lower(),
+                str(mod.get("author_github", "")).lower(),
             ]
+            tags = mod.get("tags", [])
+            if isinstance(tags, list):
+                haystacks.extend(str(t).lower() for t in tags)
             if any(keyword in h for h in haystacks):
                 result.append(mod)
+                if limit is not None and len(result) >= limit:
+                    break
         return result
 
     # ---------- 官方模组 ----------

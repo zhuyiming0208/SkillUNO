@@ -25,7 +25,7 @@ def run_mod_store():
     mods_dir = _find_mods_dir()
     mod_index = ModIndex(mods_dir=str(mods_dir))
 
-    router = Router()
+    router = Router(mod_index=mod_index)     # ← 传进去
     router.push(MainMenu(mod_index))
     router.run()
 

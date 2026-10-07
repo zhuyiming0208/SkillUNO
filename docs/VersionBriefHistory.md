@@ -9,6 +9,51 @@ ERROR 编号体系自 v1.3.1 起引入。
 > **当前版本：v1.5.0**（2026-10-06）
 
 ---
+## v1.6.0（2026-10-07）
+
+本版本完成 **CLI 模组商店阶段三**：浏览与搜索。
+
+### 新增：搜索页 `src/uno/mod_store/search.py`
+
+- 输入框支持退格删除（中文按字符删，不按字节）
+- 匹配范围：`ID` / `name` / `author` / `author_github` / `tags`，大小写不敏感
+- 结果最多返回 20 条；超过时提示"请细化搜索词"
+- 上下键选择结果，`Enter` 进入详情页，`~` 返回输入框，再 `~` 返回首页
+
+### 新增：详情页 `src/uno/mod_store/detail.py`
+
+- 展示基本字段（名称 / 作者 / 版本 / 兼容性 / GitHub / 协议）
+- `lacover=null` 显示"任意版本"
+- 简介、技能、关系（依赖 / 排斥 / 白名单）、权限声明分区展示
+- 空关系显示"无"，空 `needs` 显示"未声明"
+- `I` / `R` 返回 `INSTALL` / `VIEW_SOURCE` 指令（阶段四实现）
+
+### 修改：主菜单 `menu.py`
+
+- 精选模组上限从 8 提升到 12
+- 超过 12 个时打印警告，只保留前 12 个
+- 空状态显示"暂无精选模组"
+
+### 修改：路由 `router.py`
+
+- 支持页面栈传参，`handle_key` 可返回 `(action, payload)` 元组
+- `_dispatch` 分发 `SEARCH` / `DETAIL` 动作
+
+### 修改：输入处理 `input_handler.py`
+
+- UTF-8 多字节字符支持（按首字节判断长度补读后续字节）
+- 新增 `BACKSPACE` 事件类型（`\x7f` / `\x08`）
+- raw 模式下 `Ctrl+C` 显式抛 `KeyboardInterrupt`
+
+### 测试
+
+- 新增 `tests/test_mod_store_search.py`（约 17 个）
+- 新增 `tests/test_mod_store_detail.py`（约 19 个）
+- 新增 `tests/test_mod_store_menu_limit.py`（6 个）
+- 新增 `tests/test_mod_store_coverage.py`（约 45 个，补 router/input/main 覆盖率）
+- 全量测试：**396 → 491**，覆盖率 **84%**
+
+---
 ## v1.5.0（2026-10-06）
 
 本版本新增 **CLI 模组商店框架**（阶段二），为后续的下载、搜索、历史功能搭建终端界面骨架。

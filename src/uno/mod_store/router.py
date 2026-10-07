@@ -4,14 +4,7 @@ from uno.mod_store import input_handler as ih
 
 
 class Action:
-    """路由动作常量。
-
-    页面 handle_key() 返回：
-      - None：继续当前页面
-      - Action.QUIT：退出商店
-      - Action.BACK：返回上一页
-      - 其他 Action.* 或字符串：跳转到对应页面（阶段三实现）
-    """
+    """路由动作常量。"""
     QUIT = "QUIT"
     BACK = "BACK"
     SEARCH = "SEARCH"
@@ -21,9 +14,10 @@ class Action:
 
 
 class Router:
-    def __init__(self):
+    def __init__(self, mod_index=None):
         self.stack = []
         self.running = True
+        self.mod_index = mod_index
 
     def push(self, page):
         self.stack.append(page)
@@ -37,7 +31,7 @@ class Router:
         return self.stack[-1] if self.stack else None
 
     def run(self):
-        """主循环：渲染栈顶页面 → 读键 → 分发。"""
+        """主循环：渲染栈顶 → 读键 → 分发。"""
         try:
             while self.running and self.stack:
                 page = self.current()
@@ -46,32 +40,50 @@ class Router:
 
                 event = ih.read_key()
                 if event is None:
-                    # 非 TTY 或读键失败，退出循环（避免 CI 挂）
-                    break
-
-                if event.type == ih.EventType.QUIT:
-                    self.running = False
+                    # 非 TTY 或读键失败，退出
                     break
 
                 result = page.handle_key(event)
                 self._dispatch(result)
         except KeyboardInterrupt:
-            # Ctrl+C 优雅退出
             pass
         finally:
             clear_screen()
 
-    def _dispatch(self, action):
-        if action is None:
+    def _dispatch(self, result):
+        if result is None:
             return
+    
+        if isinstance(result, tuple):
+            action, payload = result
+        else:
+            action, payload = result, None
+
         if action == Action.QUIT:
             self.running = False
             return
+
         if action == Action.BACK:
             self.pop()
+            if not self.stack:
+                self.running = False
             return
-        # 其他动作（SEARCH / DETAIL / HISTORY / HELP）
-        # 阶段三实现对应页面；本阶段仅做占位。
-        # 简单提示后继续。
-        # 不 print 消息，避免污染渲染。
+
+        if action == Action.SEARCH:
+            if self.mod_index is None:
+                # 理论上不会到这儿（run_mod_store 会传），
+                # 但防御一下，避免静默崩溃
+                print("错误：模组索引未初始化，无法搜索。")
+                return
+            from uno.mod_store.search import SearchPage
+            self.push(SearchPage(self.mod_index))
+            return
+
+        if action == Action.DETAIL:
+            if payload is None:
+                return
+            from uno.mod_store.detail import DetailPage
+            self.push(DetailPage(payload, self.mod_index))
+            return
+
         return

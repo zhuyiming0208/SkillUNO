@@ -111,15 +111,12 @@ def cli():
         "1. 新游戏\n"
         "2. 回放录像\n"
         "3. 统计面板\n"
-        "4. 模组商店\n"
         "请选择: "
     ).strip()
     if action == '2':
         replay()
     elif action == '3':
         stats_panel()
-    elif action == '4':
-        mod_store()
     else:
         main()
 

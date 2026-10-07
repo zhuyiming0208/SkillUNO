@@ -14,6 +14,8 @@ venv/
 .DS_Store
 Thumbs.db
 .coverage
+
+# 运行时数据
 src/uno/records/
-__pycache__/
-mods/_pending/e__/
+src/uno/presets.json
+mods/_pending/

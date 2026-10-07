@@ -1,4 +1,4 @@
-"""模组商店集成测试：router 传参 + run_mod_store 清理 stdin。"""
+"""模组商店集成测试：router 传参 + run_mod_store 清理 stdin + 安装流程。"""
 import os
 import sys
 from unittest.mock import patch, MagicMock
@@ -16,9 +16,8 @@ from uno.mod_store import router as router_module
 from uno.mod_store.router import Router, Action
 
 
+# ==================== Router 传参 ====================
 class _RawPage:
-    """模拟一个要求 raw_input 的页面。"""
-
     def __init__(self):
         self.calls = []
 
@@ -37,7 +36,6 @@ class _RawPage:
 
 class TestRouterPassesRawInput:
     def test_router_passes_raw_input_to_read_key(self, monkeypatch):
-        """页面 wants_raw_input=True 时，router 传 raw_input=True 给 read_key。"""
         captured = []
 
         def fake_read_key(raw_input=False):
@@ -53,10 +51,9 @@ class TestRouterPassesRawInput:
         with patch("uno.mod_store.render.clear_screen"):
             r.run()
 
-        assert captured == [True], f"预期 raw_input=True，实际 {captured}"
+        assert captured == [True]
 
     def test_router_passes_false_when_no_method(self, monkeypatch):
-        """页面无 wants_raw_input 方法时，传 raw_input=False。"""
         captured = []
 
         def fake_read_key(raw_input=False):
@@ -83,7 +80,6 @@ class TestRouterPassesRawInput:
         assert captured == [False]
 
     def test_router_passes_false_when_wants_raw_false(self, monkeypatch):
-        """页面 wants_raw_input() 返回 False 时，传 raw_input=False。"""
         captured = []
 
         def fake_read_key(raw_input=False):
@@ -113,9 +109,9 @@ class TestRouterPassesRawInput:
         assert captured == [False]
 
 
+# ==================== run_mod_store 清理 stdin ====================
 class TestRunModStoreDrainsStdin:
     def test_run_mod_store_drains_stdin(self):
-        """run_mod_store() 应调用 _drain_stdin()。"""
         from uno.mod_store import main as store_main
 
         with patch.object(store_main, "_drain_stdin") as mock_drain, \
@@ -127,7 +123,127 @@ class TestRunModStoreDrainsStdin:
         mock_drain.assert_called_once()
 
     def test_drain_stdin_no_tty(self):
-        """_drain_stdin 在无 TTY 环境下不崩。"""
         from uno.mod_store import main as store_main
-        # 直接调用，CI 环境无残留字节，正常返回
         store_main._drain_stdin()
+
+
+# ==================== 安装流程 ====================
+class TestRouterInstallFlow:
+    def _router(self, monkeypatch):
+        r = Router(mod_index=MagicMock(), mods_dir="mods",
+                   pending_dir="mods/_pending")
+        monkeypatch.setattr(router_module.ih, "read_key",
+                            lambda **kw: ih.KeyEvent(ih.EventType.QUIT))
+        return r
+
+    def test_detail_install_pushes_confirm(self, monkeypatch):
+        from uno.mod_store.detail import DetailPage
+        from uno.mod_store.confirm import ConfirmPage
+        r = self._router(monkeypatch)
+        page = DetailPage({"ID": "X", "name": "X"})
+        r.push(page)
+        with patch("uno.mod_store.downloader.check_existing",
+                   return_value=None):
+            r._dispatch("INSTALL")
+        assert isinstance(r.current(), ConfirmPage)
+
+    def test_confirm_success_pushes_enable(self, monkeypatch):
+        from uno.mod_store.confirm import ConfirmPage
+        from uno.mod_store.enable import EnablePage
+        r = self._router(monkeypatch)
+        page = ConfirmPage({"ID": "X", "name": "X"})
+        r.push(page)
+        with patch("uno.mod_store.downloader.download_mod",
+                   return_value=(True, "mods/_pending/X.py")), \
+             patch("uno.mod_store.validator.validate_download",
+                   return_value=(True, "", "X")):
+            r._dispatch("CONFIRM")
+        assert isinstance(r.current(), EnablePage)
+
+    def test_confirm_download_fail_sets_error(self, monkeypatch):
+        from uno.mod_store.confirm import ConfirmPage
+        r = self._router(monkeypatch)
+        page = ConfirmPage({"ID": "X", "name": "X"})
+        r.push(page)
+        with patch("uno.mod_store.downloader.download_mod",
+                   return_value=(False, "网络失败")):
+            r._dispatch("CONFIRM")
+        assert page.error == "网络失败"
+        assert r.current() is page
+
+    def test_confirm_validate_fail_sets_error(self, monkeypatch):
+        from uno.mod_store.confirm import ConfirmPage
+        r = self._router(monkeypatch)
+        page = ConfirmPage({"ID": "X", "name": "X"})
+        r.push(page)
+        with patch("uno.mod_store.downloader.download_mod",
+                   return_value=(True, "p")), \
+             patch("uno.mod_store.validator.validate_download",
+                   return_value=(False, "语法错误", None)):
+            r._dispatch("CONFIRM")
+        assert page.error == "语法错误"
+        assert r.current() is page
+
+    def test_enable_success_pops_and_shows_message(self, monkeypatch):
+        from uno.mod_store.detail import DetailPage
+        from uno.mod_store.confirm import ConfirmPage
+        from uno.mod_store.enable import EnablePage
+        from uno.mod_store.router import MessagePage
+        r = self._router(monkeypatch)
+        d = DetailPage({"ID": "X", "name": "X"})
+        c = ConfirmPage({"ID": "X", "name": "X"})
+        e = EnablePage("X", "mods/_pending/X.py")
+        r.push(d)
+        r.push(c)
+        r.push(e)
+        with patch("uno.mod_store.downloader.enable_mod",
+                   return_value=(True, "mods/X.py")):
+            r._dispatch("ENABLE")
+        assert isinstance(r.current(), MessagePage)
+        assert "已启用" in r.current().message
+
+    def test_keep_pending_pops_and_shows_message(self, monkeypatch):
+        from uno.mod_store.detail import DetailPage
+        from uno.mod_store.confirm import ConfirmPage
+        from uno.mod_store.enable import EnablePage
+        from uno.mod_store.router import MessagePage
+        r = self._router(monkeypatch)
+        d = DetailPage({"ID": "X", "name": "X"})
+        c = ConfirmPage({"ID": "X", "name": "X"})
+        e = EnablePage("X", "p")
+        r.push(d)
+        r.push(c)
+        r.push(e)
+        r._dispatch("KEEP_PENDING")
+        assert isinstance(r.current(), MessagePage)
+        assert "保留" in r.current().message
+
+    def test_enable_fail_sets_error(self, monkeypatch):
+        from uno.mod_store.detail import DetailPage
+        from uno.mod_store.confirm import ConfirmPage
+        from uno.mod_store.enable import EnablePage
+        r = self._router(monkeypatch)
+        d = DetailPage({"ID": "X", "name": "X"})
+        c = ConfirmPage({"ID": "X", "name": "X"})
+        e = EnablePage("X", "p")
+        r.push(d)
+        r.push(c)
+        r.push(e)
+        with patch("uno.mod_store.downloader.enable_mod",
+                   return_value=(False, "备份失败")):
+            r._dispatch("ENABLE")
+        assert e.error == "备份失败"
+        assert r.current() is e
+
+
+# ==================== MessagePage ====================
+class TestMessagePage:
+    def test_render(self):
+        from uno.mod_store.router import MessagePage
+        text = MessagePage("测试消息").render()
+        assert "测试消息" in text
+
+    def test_any_key_returns_back(self):
+        from uno.mod_store.router import MessagePage
+        page = MessagePage("X")
+        assert page.handle_key(ih.KeyEvent(ih.EventType.CHAR, "z")) == Action.BACK

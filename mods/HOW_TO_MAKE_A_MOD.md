@@ -4,6 +4,16 @@
 你需要在模组仓库根目录放一个 `skilluno_mod.json` 文件，并在 GitHub 仓库加上
 `skilluno-mod` topic，就能被自动收录。
 
+### 模组文件托管约定
+
+为了让 CLI 商店能自动下载你的模组 `.py` 文件，请遵循以下约定：
+
+1. **仓库根目录必须有一个 `skilluno_mod.json`**（即本文档描述的元数据文件）。
+2. **`.py` 文件默认命名为 `{ID}.py`**，可用 `py_file` 字段覆盖。
+3. **默认分支 `main`**，可用 `branch` 字段覆盖；`main` 拉取失败时会自动尝试 `master`。
+4. **下载 URL 格式（首选）**：https://raw.githubusercontent.com/{author_github}/{repo_name}/{branch}/{py_file}
+5. **备选 URL 格式（jsDelivr）**：https://cdn.jsdelivr.net/gh/{author_github}/{repo_name}@{branch}/{py_file}
+
 ### 单模组 JSON（`skilluno_mod.json`）
 
 | 字段 | 必填 | 类型 | 说明 |
@@ -27,6 +37,8 @@
 | `tags` | ❌ | list[str] | 标签，用于分类检索 |
 | `created_at` | ❌ | str | 创建日期，`YYYY-MM-DD` |
 | `updated_at` | ❌ | str | 更新日期，`YYYY-MM-DD` |
+| `py_file` | ❌ | str | `.py` 文件名，默认 `{ID}.py` |
+| `branch` | ❌ | str | 仓库分支，默认 `main`，404 时自动试 `master` |
 
 ### 空值写法
 
@@ -67,6 +79,14 @@ CLI 商店读取的本地索引，由 GitHub Action 自动维护：
 
 ⚠️ 第三方模组由社区作者提供，SkillUNO 官方不对其内容负责。
 下载和安装前，请确认来源可信、代码可审计。若发现恶意行为，请提交 Issue。
+
+### 下载安全机制
+
+- 只从 `raw.githubusercontent.com` 与 `cdn.jsdelivr.net` 下载
+- 单文件 ≤ 5MB
+- 不做重定向追踪
+- 下载后先入 `mods/_pending/`，静态验证（`ast.parse`）通过后才允许启用
+- 启用时若已存在同 ID，先备份为 `.bak`，成功后清理；失败时自动恢复
 
 ---
 

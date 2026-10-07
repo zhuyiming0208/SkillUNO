@@ -10,11 +10,10 @@ venv/
 .vscode/
 .idea/
 
-# 运行时数据
-
 # 系统
 .DS_Store
 Thumbs.db
 .coverage
 src/uno/records/
 __pycache__/
+mods/_pending/e__/

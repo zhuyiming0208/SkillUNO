@@ -17,5 +17,7 @@
   "only_tolerate": [],
   "tags": ["示例"],
   "created_at": "2026-10-06",
-  "updated_at": "2026-10-06"
+  "updated_at": "2026-10-07",
+  "py_file": "EXAMPLE.py",
+  "branch": "main"
 }

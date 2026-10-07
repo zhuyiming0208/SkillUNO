@@ -143,11 +143,13 @@ class TestRouterMainLoop:
             r._dispatch(Action.SEARCH)
             assert fake_page in r.stack
 
-    def test_dispatch_search_no_mod_index(self, capsys):
+    def test_dispatch_search_no_mod_index(self):
         r = Router(mod_index=None)
         r._dispatch(Action.SEARCH)
-        out = capsys.readouterr().out
-        assert "错误" in out or r.stack == []
+        # 现在 router 会 push 一个 MessagePage 而非 print
+        assert len(r.stack) == 1
+        msg = getattr(r.stack[0], "message", "")
+        assert "错误" in msg or "未初始化" in msg
 
     def test_dispatch_unknown_action(self):
         r = Router()

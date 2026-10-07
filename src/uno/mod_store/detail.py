@@ -11,9 +11,10 @@ class DetailPage:
 
     BOX_WIDTH = 70
 
-    def __init__(self, mod_data, mod_index=None):
+    def __init__(self, mod_data, mod_index=None, history_path=None):
         self.mod = mod_data
         self.mod_index = mod_index
+        self.history_path = history_path
 
     # ---------- 渲染 ----------
     def render(self) -> str:

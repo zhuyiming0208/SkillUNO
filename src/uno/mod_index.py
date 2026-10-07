@@ -154,3 +154,10 @@ class ModIndex:
     def get_official(self) -> List[Dict]:
         """获取官方内建模组列表（深拷贝，防止外部污染常量）。"""
         return copy.deepcopy(OFFICIAL_MODS)
+
+    def get_by_id(self, mod_id):
+        """按 ID 查找模组元数据。大小写敏感。未找到返回 None。"""
+        for mod in self.get_all():
+            if mod.get("ID") == mod_id:
+                return mod
+        return None

@@ -13,8 +13,9 @@ class SearchPage:
     MAX_RESULTS = 20
     MAX_DISPLAY = 10
 
-    def __init__(self, mod_index):
+    def __init__(self, mod_index, history_path=None):
         self.mod_index = mod_index
+        self.history_path = history_path
         self.query = ""
         self.results = []
         self.selected = 0

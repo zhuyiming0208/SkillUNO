@@ -19,3 +19,5 @@ Thumbs.db
 src/uno/records/
 src/uno/presets.json
 mods/_pending/
+mods/history.json
+mods/history.json.tmp

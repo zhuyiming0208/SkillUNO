@@ -114,7 +114,8 @@ class TestMenuActions:
         assert _make_menu().handle_key(ih.KeyEvent(ih.EventType.SEARCH)) == Action.SEARCH
 
     def test_help(self):
-        assert _make_menu().handle_key(ih.KeyEvent(ih.EventType.HELP)) == Action.HELP
+        # 阶段五：H 键现在跳转历史页
+        assert _make_menu().handle_key(ih.KeyEvent(ih.EventType.HELP)) == Action.HISTORY
 
     def test_enter_returns_detail(self):
         result = _make_menu().handle_key(ih.KeyEvent(ih.EventType.ENTER))

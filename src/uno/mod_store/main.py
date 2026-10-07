@@ -41,16 +41,17 @@ def run_mod_store():
     _drain_stdin()
     mods_dir = _find_mods_dir()
     pending_dir = mods_dir / "_pending"
+    history_path = mods_dir / "history.json"
     mod_index = ModIndex(mods_dir=str(mods_dir))
 
     router = Router(
         mod_index=mod_index,
         mods_dir=str(mods_dir),
         pending_dir=str(pending_dir),
+        history_path=str(history_path),
     )
-    router.push(MainMenu(mod_index))
+    router.push(MainMenu(mod_index, str(history_path)))
     router.run()
-
 
 if __name__ == "__main__":
     run_mod_store()

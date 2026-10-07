@@ -12,8 +12,9 @@ class MainMenu:
     MAX_HANDPICKED_DISPLAY = 12
     BOX_WIDTH = 60
 
-    def __init__(self, mod_index):
+    def __init__(self, mod_index, history_path=None):
         self.mod_index = mod_index
+        self.history_path = history_path
         self.official = mod_index.get_official()
         self.handpicked = mod_index.get_handpicked()
         self.selected = 0
@@ -99,7 +100,7 @@ class MainMenu:
         if key.type == ih.EventType.SEARCH:
             return Action.SEARCH
         if key.type == ih.EventType.HELP:
-            return Action.HELP
+            return Action.HISTORY
         if key.type == ih.EventType.ENTER:
             mod = self.current_mod()
             if mod is None:

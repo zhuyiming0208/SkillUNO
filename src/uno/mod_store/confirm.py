@@ -1,6 +1,7 @@
 """下载确认页。"""
 from uno.mod_store import input_handler as ih
 from uno.mod_store.render import draw_box, pad_text, colorize
+from uno.mod_store.history import check_downloaded
 
 
 def _fmt_dict(d):
@@ -18,16 +19,26 @@ def _fmt_list(lst):
 class ConfirmPage:
     BOX_WIDTH = 74
 
-    def __init__(self, mod_data, existing=None):
+    def __init__(self, mod_data, existing=None, mod_index=None, history_path=None):
         self.mod = mod_data
         self.existing = existing
+        self.mod_index = mod_index
+        self.history_path = history_path
         self.error = None
+        try:
+            self.last_record = (
+                check_downloaded(mod_data.get("ID", ""), history_path)
+                if history_path else None
+            )
+        except Exception:
+            self.last_record = None
 
     def render(self) -> str:
         mod = self.mod
         lines = []
         title = "确认下载"
-        lines.append(colorize(pad_text(title, self.BOX_WIDTH, "center"), "bright_cyan"))
+        lines.append(colorize(pad_text(title, self.BOX_WIDTH, "center"),
+                              "bright_cyan"))
         lines.append("")
         lines.append(f"  模组：{mod.get('name', '?')}")
         lines.append(f"  作者：{mod.get('author', '?')}")
@@ -46,39 +57,45 @@ class ConfirmPage:
         lines.append(f"  排斥：{_fmt_dict(mod.get('reject'))}")
         lines.append(f"  白名单：{_fmt_list(mod.get('only_tolerate'))}")
         lines.append("")
-
+        if self.last_record:
+            r = self.last_record
+            t = (r.get("time") or "")[:16]
+            ver = r.get("version", "?")
+            status = r.get("status")
+            if status == "uninstalled":
+                lines.append(colorize(
+                    f"  ⚠️ 该模组曾被卸载（{t}）。继续将重新下载。", "red"
+                ))
+            else:
+                lines.append(colorize(
+                    f"  ⚠️ 检测到历史记录：{t} 下载过 v{ver}。继续将重新下载。",
+                    "red"
+                ))
+            lines.append("")
         if self.existing:
             loc = self.existing.get("location")
             path = self.existing.get("path", "")
             if loc == "installed":
                 lines.append(colorize(
                     f"  ⚠️ 检测到已安装同 ID 模组：{path}，继续将覆盖已安装版本。",
-                    "red"
-                ))
+                    "red"))
             elif loc == "pending":
                 lines.append(colorize(
                     f"  ⚠️ 检测到待启用同 ID 模组：{path}，继续将重新下载并覆盖。",
-                    "red"
-                ))
+                    "red"))
             lines.append("")
-
         if self.error:
             lines.append(colorize(f"  ❌ {self.error}", "red"))
             lines.append("")
             lines.append(colorize("  按任意键返回...", "dim"))
             return draw_box(lines, self.BOX_WIDTH)
-
-        # 安全提示
         lines.append(colorize(
-            "  ⚠️ 启用后，模组代码将在游戏下次启动时执行。", "red"
-        ))
+            "  ⚠️ 启用后，模组代码将在游戏下次启动时执行。", "red"))
         lines.append(colorize(
-            "     请确认作者可信。若不放心，可保留在 _pending/ 不启用。", "red"
-        ))
+            "     请确认作者可信。若不放心，可保留在 _pending/ 不启用。", "red"))
         lines.append("")
         lines.append(colorize(
-            "  若下载后 ID 与已有模组冲突，将拒绝启用。", "dim"
-        ))
+            "  若下载后 ID 与已有模组冲突，将拒绝启用。", "dim"))
         lines.append("")
         lines.append(colorize("  Y 确认下载 | N / ~ 返回", "dim"))
         return draw_box(lines, self.BOX_WIDTH)
@@ -87,10 +104,8 @@ class ConfirmPage:
         if self.error:
             self.error = None
             return None
-
         if key.type in (ih.EventType.BACK, ih.EventType.QUIT):
             return "BACK"
-
         if key.type == ih.EventType.CHAR and key.char:
             ch = key.char.lower()
             if ch == "y":

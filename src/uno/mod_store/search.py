@@ -63,6 +63,10 @@ class SearchPage:
             text = colorize(text, "bright_cyan")
         return text
 
+    def wants_raw_input(self):
+        """输入框状态需要原始字符输入，不要被键位映射吞掉。"""
+        return self.state == "INPUT"
+
     # ---------- 按键 ----------
     def handle_key(self, key):
         if self.state == "INPUT":

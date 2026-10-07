@@ -203,3 +203,46 @@ class TestSearchRender:
         _press_enter(page)
         text = page.render()
         assert "未找到匹配的模组" in text
+
+# ==================== raw_input 模式测试 ====================
+class TestRawInputMode:
+    def test_raw_input_allows_command_letters(self):
+        """raw_input 模式下 'e'/'x'/'l' 等命令字母应能正常输入。"""
+        from uno.mod_store import input_handler as ih
+        for ch in ('e', 'x', 'l', 'r', 'u', 'd', 's', 'h', 'q'):
+            ev = ih._map_char(ch, raw_input=True)
+            assert ev.type == ih.EventType.CHAR, f"{ch} 应为 CHAR"
+            assert ev.char == ch
+
+    def test_raw_input_still_supports_back(self):
+        from uno.mod_store import input_handler as ih
+        ev = ih._map_char('~', raw_input=True)
+        assert ev.type == ih.EventType.BACK
+
+    def test_raw_input_still_supports_enter(self):
+        from uno.mod_store import input_handler as ih
+        ev = ih._map_char('\r', raw_input=True)
+        assert ev.type == ih.EventType.ENTER
+
+    def test_raw_input_still_supports_backspace(self):
+        from uno.mod_store import input_handler as ih
+        ev = ih._map_char('\x7f', raw_input=True)
+        assert ev.type == ih.EventType.BACKSPACE
+
+    def test_raw_input_space_is_char(self):
+        from uno.mod_store import input_handler as ih
+        ev = ih._map_char(' ', raw_input=True)
+        assert ev.type == ih.EventType.CHAR
+        assert ev.char == ' '
+
+    def test_search_page_input_state_wants_raw(self):
+        from uno.mod_store.search import SearchPage
+        page = SearchPage(None)
+        assert page.state == "INPUT"
+        assert page.wants_raw_input() is True
+
+    def test_search_page_results_state_normal(self):
+        from uno.mod_store.search import SearchPage
+        page = SearchPage(None)
+        page.state = "RESULTS"
+        assert page.wants_raw_input() is False

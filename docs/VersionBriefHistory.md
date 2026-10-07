@@ -4,11 +4,26 @@
 ERROR 编号体系自 v1.3.1 起引入。
 完整的 API 说明请参阅 docs/DEVELOPER_GUIDE.md。
 
-本文档按版本顺序（由新到旧）记录从 v0.1.0 到 v1.6.0 期间的所有修复内容。每个版本列出该版本修复的 bug、调整的功能及对应的错误编号。
+本文档按版本顺序（由新到旧）记录从 v0.1.0 到 v1.6.1 期间的所有修复内容。每个版本列出该版本修复的 bug、调整的功能及对应的错误编号。
 
-> **当前版本：v1.6.0**（2026-10-07）
+> **当前版本：v1.6.1**（2026-10-07）
 
 ---
+## v1.6.1（2026-10-07）
+
+### 修复：搜索框无法输入命令关键字
+
+- **现象**：搜索页输入 `example` 只显示 `amp`
+- **根因**：`_map_char` 把字母无条件映射为命令，`e/x/l/r/u/d/s/h/q` 被吞
+- **修复**：引入 `raw_input` 模式，搜索页输入状态跳过命令映射
+- **改动**：
+  - `input_handler.read_key(raw_input=False)` / `_map_char(ch, raw_input=False)`
+  - `router.run()` 按页面 `wants_raw_input()` 决定是否走 raw
+  - `search.SearchPage.wants_raw_input()`：输入状态返回 `True`
+- **测试**：新增 7 个 raw_input 模式测试，总数 491 → 498
+
+---
+
 ## v1.6.0（2026-10-07）
 
 本版本完成 **CLI 模组商店阶段三**：浏览与搜索。
@@ -768,10 +783,11 @@ TODO-006 联机模式 待定
 ```bash
 python -m unittest tests.test_1_3_3
 python -m unittest tests.test_mod_index
+……
 ```
 
 预期输出：Ran xxx tests in ... OK。
 
 ---
 
-最后更新：2026-10-06 · v1.4.0
+最后更新：2026-10-07 · v1.6.1

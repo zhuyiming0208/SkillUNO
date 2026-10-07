@@ -177,7 +177,25 @@ def main():
         args.dry_run,
     )
 
-    # 5. 可选：插入新条目
+    # 5. 尾部"最后更新"（带版本号）
+    ok_count += replace_pattern(
+        history,
+        r'最后更新：[\d-]+ · v[\d.]+',
+        f'最后更新：{date} · v{ver}',
+        "尾部最后更新",
+        args.dry_run,
+    )
+
+    # 6. DEVELOPER_GUIDE 头部的"最后更新"（只有日期）
+    ok_count += replace_pattern(
+        guide,
+        r'\*\*最后更新：[\d-]+\*\*',
+        f'**最后更新：{date}**',
+        "头部最后更新",
+        args.dry_run,
+    )
+
+    # 7. 可选：插入新条目
     if args.new_entry:
         print()
         insert_new_entry(history, ver, date, args.new_entry, args.dry_run)

@@ -57,7 +57,7 @@ class TestRouterMainLoop:
         r.push(page)
         # read_key 返回 QUIT，_FakePage 会把它转成 Action.QUIT
         monkeypatch.setattr(router_module.ih, "read_key",
-                            lambda: ih.KeyEvent(ih.EventType.QUIT))
+                            lambda **kw: ih.KeyEvent(ih.EventType.QUIT))
         with patch("uno.mod_store.render.clear_screen"):
             r.run()
         assert r.running is False
@@ -67,7 +67,7 @@ class TestRouterMainLoop:
         r = Router()
         r.push(page)
         monkeypatch.setattr(router_module.ih, "read_key",
-                            lambda: ih.KeyEvent(ih.EventType.UP))
+                            lambda **kw: ih.KeyEvent(ih.EventType.UP))
         with patch("uno.mod_store.render.clear_screen"):
             r.run()
         assert r.running is False
@@ -80,7 +80,7 @@ class TestRouterMainLoop:
         r.push(page2)
         calls = [0]
 
-        def fake_read():
+        def fake_read(**kw):
             calls[0] += 1
             if calls[0] >= 3:
                 return None
@@ -97,7 +97,7 @@ class TestRouterMainLoop:
         r = Router()
         r.push(page)
         monkeypatch.setattr(router_module.ih, "read_key",
-                            lambda: ih.KeyEvent(ih.EventType.UP))
+                            lambda **kw: ih.KeyEvent(ih.EventType.UP))
         with patch("uno.mod_store.render.clear_screen"):
             r.run()
         assert r.running is False
@@ -106,7 +106,7 @@ class TestRouterMainLoop:
         page = _FakePage()
         r = Router()
         r.push(page)
-        monkeypatch.setattr(router_module.ih, "read_key", lambda: None)
+        monkeypatch.setattr(router_module.ih, "read_key", lambda **kw: None)
         with patch("uno.mod_store.render.clear_screen"):
             r.run()
         assert page.rendered >= 1
@@ -116,7 +116,7 @@ class TestRouterMainLoop:
         r = Router()
         r.push(page)
 
-        def raise_ki():
+        def raise_ki(**kw):
             raise KeyboardInterrupt()
 
         monkeypatch.setattr(router_module.ih, "read_key", raise_ki)
@@ -210,7 +210,7 @@ class TestInputHandlerEdge:
         seq = [b"\xe7", b"\xa4", b"\xba"]
         calls = [0]
 
-        def fake_read():
+        def fake_read(**kw):
             if calls[0] < len(seq):
                 b = seq[calls[0]]
                 calls[0] += 1
@@ -227,7 +227,7 @@ class TestInputHandlerEdge:
         seq = [b"\xc2", b"\xa9"]
         calls = [0]
 
-        def fake_read():
+        def fake_read(**kw):
             if calls[0] < len(seq):
                 b = seq[calls[0]]
                 calls[0] += 1
@@ -244,7 +244,7 @@ class TestInputHandlerEdge:
         seq = [b"\xf0", b"\x9f", b"\x98", b"\x80"]
         calls = [0]
 
-        def fake_read():
+        def fake_read(**kw):
             if calls[0] < len(seq):
                 b = seq[calls[0]]
                 calls[0] += 1
@@ -264,7 +264,7 @@ class TestInputHandlerEdge:
     def test_read_key_incomplete_utf8(self, monkeypatch):
         calls = [0]
 
-        def fake_read():
+        def fake_read(**kw):
             calls[0] += 1
             if calls[0] == 1:
                 return b"\xe7"

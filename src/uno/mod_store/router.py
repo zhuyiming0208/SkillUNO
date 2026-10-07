@@ -85,5 +85,3 @@ class Router:
             from uno.mod_store.detail import DetailPage
             self.push(DetailPage(payload, self.mod_index))
             return
-
-        return

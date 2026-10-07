@@ -81,7 +81,7 @@ class KeyEvent:
 
 
 # ---------- 读取 ----------
-def read_key() -> Optional[KeyEvent]:
+def read_key(raw_input: bool = False) -> Optional[KeyEvent]:
     """读取单个按键（含 UTF-8 多字节字符）。"""
     try:
         first = _read_bytes()
@@ -125,7 +125,7 @@ def read_key() -> Optional[KeyEvent]:
     except UnicodeDecodeError:
         ch = buf.decode('utf-8', errors='replace')
 
-    return _map_char(ch)
+    return _map_char(ch, raw_input=raw_input)
 
 
 def _read_bytes() -> Optional[bytes]:
@@ -171,15 +171,28 @@ def _read_unix_bytes() -> Optional[bytes]:
     return data if data else None
 
 
-def _map_char(ch: str) -> KeyEvent:
-    """字符 → KeyEvent。字母统一小写化后再匹配。"""
-    lowered = ch.lower()
+def _map_char(ch: str, raw_input: bool = False) -> KeyEvent:
+    """字符 → KeyEvent。
 
-    # 退格（先判断）
+    raw_input=True 时跳过命令映射，用于文本输入场景。
+    """
+    # 退格（所有模式都保留）
     if ch in ('\x7f', '\x08'):
         return KeyEvent(EventType.BACKSPACE)
 
-    # 确认键（'e' 与字母键冲突，先判断）
+    # 回车（所有模式都保留）
+    if ch in ('\r', '\n'):
+        return KeyEvent(EventType.ENTER, ch)
+
+    # ---- 原始输入模式：只保留 ~ 作为返回 ----
+    if raw_input:
+        if ch == KEY_BACK:
+            return KeyEvent(EventType.BACK)
+        return KeyEvent(EventType.CHAR, ch)
+
+    # ---- 以下为正常命令模式 ----
+    lowered = ch.lower()
+
     if lowered in KEY_CONFIRM_CHARS:
         return KeyEvent(EventType.ENTER, ch)
 

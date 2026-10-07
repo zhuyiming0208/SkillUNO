@@ -19,11 +19,15 @@ def _fmt_list(lst):
 class ConfirmPage:
     BOX_WIDTH = 74
 
-    def __init__(self, mod_data, existing=None, mod_index=None, history_path=None):
+    def __init__(self, mod_data, existing=None, mod_index=None, history_path=None,
+                 is_update=False, local_version=None, latest_version=None):
         self.mod = mod_data
         self.existing = existing
         self.mod_index = mod_index
         self.history_path = history_path
+        self.is_update = is_update
+        self.local_version = local_version
+        self.latest_version = latest_version
         self.error = None
         try:
             self.last_record = (
@@ -36,13 +40,16 @@ class ConfirmPage:
     def render(self) -> str:
         mod = self.mod
         lines = []
-        title = "确认下载"
+        title = "更新模组" if self.is_update else "确认下载"
         lines.append(colorize(pad_text(title, self.BOX_WIDTH, "center"),
                               "bright_cyan"))
         lines.append("")
         lines.append(f"  模组：{mod.get('name', '?')}")
         lines.append(f"  作者：{mod.get('author', '?')}")
-        lines.append(f"  版本：{mod.get('version', '?')}")
+        if self.is_update and self.local_version and self.latest_version:
+            lines.append(f"  版本：v{self.local_version} → v{self.latest_version}")
+        else:
+            lines.append(f"  版本：{mod.get('version', '?')}")
         lines.append(f"  来源：{mod.get('repo', '?')}")
         lines.append("")
         lines.append(
@@ -97,7 +104,10 @@ class ConfirmPage:
         lines.append(colorize(
             "  若下载后 ID 与已有模组冲突，将拒绝启用。", "dim"))
         lines.append("")
-        lines.append(colorize("  Y 确认下载 | N / ~ 返回", "dim"))
+        if self.is_update:
+            lines.append(colorize("  Y 确认更新 | N / ~ 返回", "dim"))
+        else:
+            lines.append(colorize("  Y 确认下载 | N / ~ 返回", "dim"))
         return draw_box(lines, self.BOX_WIDTH)
 
     def handle_key(self, key):

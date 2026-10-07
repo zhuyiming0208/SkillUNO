@@ -44,13 +44,21 @@ def run_mod_store():
     history_path = mods_dir / "history.json"
     mod_index = ModIndex(mods_dir=str(mods_dir))
 
+    enabled_path = mods_dir / "enabled.json"
+    collections_path = mods_dir / "collections.json"
+
     router = Router(
         mod_index=mod_index,
         mods_dir=str(mods_dir),
         pending_dir=str(pending_dir),
         history_path=str(history_path),
+        enabled_path=str(enabled_path),
+        collections_path=str(collections_path),
     )
-    router.push(MainMenu(mod_index, str(history_path)))
+    router.push(MainMenu(mod_index, str(history_path),
+                         enabled_path=str(enabled_path),
+                         mods_dir=str(mods_dir),
+                         collections_path=str(collections_path)))
     router.run()
 
 if __name__ == "__main__":

@@ -11,10 +11,11 @@ class DetailPage:
 
     BOX_WIDTH = 70
 
-    def __init__(self, mod_data, mod_index=None, history_path=None):
+    def __init__(self, mod_data, mod_index=None, history_path=None, enabled_path=None):
         self.mod = mod_data
         self.mod_index = mod_index
         self.history_path = history_path
+        self.enabled_path = enabled_path
 
     # ---------- 渲染 ----------
     def render(self) -> str:
@@ -88,7 +89,13 @@ class DetailPage:
         lines.append("")
 
         # 操作栏
-        lines.append(colorize("  I 安装 | R 查看源码 | Q 返回", "dim"))
+        installed = self._is_installed()
+        if installed:
+            enabled = self._is_enabled()
+            toggle = "E 禁用" if enabled else "E 启用"
+            lines.append(colorize(f"  {toggle} | D 卸载 | R 查看源码 | Q 返回", "dim"))
+        else:
+            lines.append(colorize("  I 安装 | R 查看源码 | Q 返回", "dim"))
 
         return draw_box(lines, self.BOX_WIDTH)
 
@@ -111,7 +118,30 @@ class DetailPage:
             ch = key.char.lower()
             if ch == 'i':
                 return "INSTALL"
+            if ch == 'e':
+                if self._is_installed():
+                    return (Action.TOGGLE_ENABLE, self.mod)
+                return None
+            if ch == 'd':
+                if self._is_installed():
+                    return (Action.UNINSTALL_CONFIRM, self.mod)
+                return None
             if ch == 'r':
                 return "VIEW_SOURCE"
 
         return None
+
+    def _is_installed(self):
+        import os
+        if not self.enabled_path:
+            return False
+        mods_dir = os.path.dirname(self.enabled_path)
+        mod_id = self.mod.get("ID", "")
+        return bool(mod_id) and os.path.isfile(os.path.join(mods_dir, f"{mod_id}.py"))
+
+    def _is_enabled(self):
+        from uno.enabled import is_mod_enabled
+        if not self.enabled_path:
+            return True
+        mod_id = self.mod.get("ID", "")
+        return is_mod_enabled(mod_id, self.enabled_path)

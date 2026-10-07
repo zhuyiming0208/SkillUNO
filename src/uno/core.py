@@ -481,7 +481,8 @@ class UNOGame:
                  dev_skills: Dict[str, List[type]] = None, use_rich_ui: bool = False,
                  recorder: 'GameRecorder' = None, players: List[str] = None,
                  human_ui: ConsoleUI = None, ai_ui: ConsoleUI = None,
-                 hand_limit: int = 15, initial_hand_size: int = 7, initial_skill_count: int = 3):
+                 hand_limit: int = 15, initial_hand_size: int = 7, initial_skill_count: int = 3,
+                 enabled_path: str = None):
         if enabled_seasons is None:
             enabled_seasons = ['S1']
         enabled_seasons = list(set(enabled_seasons))
@@ -532,7 +533,9 @@ class UNOGame:
         self.event_log = []
 
         from .skills_uno import SkillLoader
-        self.skill_pool, self.skill_glossary, mod_achievements = SkillLoader.load_skills(enabled_seasons, self)
+        self.skill_pool, self.skill_glossary, mod_achievements = SkillLoader.load_skills(
+            enabled_seasons, self, enabled_path=enabled_path
+        )
         self.skill_manager = SkillManager(self)
 
         self.achievements = AchievementManager(self, get_core_achievements())

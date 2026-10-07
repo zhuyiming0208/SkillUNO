@@ -11,7 +11,16 @@ class SkillLoader:
     }
 
     @classmethod
-    def load_skills(cls, enabled_seasons: List[str], game):
+    def load_skills(cls, enabled_seasons: List[str], game, mods_dir=None, enabled_path=None):
+        # 路径解析（阶段六：enabled.json 支持）
+        from uno.paths import find_mods_dir
+        from uno.enabled import load_disabled
+        if mods_dir is None:
+            mods_dir = str(find_mods_dir())
+        if enabled_path is None:
+            enabled_path = os.path.join(mods_dir, "enabled.json")
+        _disabled = load_disabled(enabled_path)
+
         all_classes = []
         skill_glossary = {}
         mod_achievements = []
@@ -31,7 +40,7 @@ class SkillLoader:
                 print(f"错误：无法导入赛季模块 {module_name} - {e}")
 
         # Mods
-        mods_dir = os.path.join(os.path.dirname(__file__), '..', '..', 'mods')
+        # mods_dir 已由参数决定（见上方路径解析）
         if os.path.exists(mods_dir):
             for filename in sorted(os.listdir(mods_dir)):
                 if filename.endswith('.py') and not filename.startswith('_'):
@@ -40,7 +49,7 @@ class SkillLoader:
                     try:
                         module = importlib.import_module(full_module_name)
                         mod_id = getattr(module, 'SEASON_ID', None)
-                        if mod_id in enabled_seasons:
+                        if mod_id in enabled_seasons and mod_id not in _disabled:
                             info = cls._extract_module_info(module, full_module_name, mod_id)
                             candidates.append(info)
                     except ImportError as e:

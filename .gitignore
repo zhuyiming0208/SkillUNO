@@ -21,3 +21,7 @@ src/uno/presets.json
 mods/_pending/
 mods/history.json
 mods/history.json.tmp
+mods/enabled.json
+mods/enabled.json.tmp
+mods/collections.json
+mods/collections.json.tmp

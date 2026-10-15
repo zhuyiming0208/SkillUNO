@@ -4,9 +4,32 @@
 ERROR 编号体系自 v1.3.1 起引入。
 完整的 API 说明请参阅 docs/DEVELOPER_GUIDE.md。
 
-本文档按版本顺序（由新到旧）记录从 v0.1.0 到 v1.9.0 期间的所有修复内容。每个版本列出该版本修复的 bug、调整的功能及对应的错误编号。
+本文档按版本顺序（由新到旧）记录从 v0.1.0 到 v1.10.0 期间的所有修复内容。每个版本列出该版本修复的 bug、调整的功能及对应的错误编号。
 
-> **当前版本：v1.9.0**（2026-10-07）
+> **当前版本：v1.10.0**（2026-10-15）
+
+---
+
+## v1.10.0（2026-10-15）
+
+网页版商店（阶段一：首页 + 部署）
+
+### 新增
+
+- **`web/` 目录**：纯原生 HTML/CSS/JS 的网页版模组商店
+  - `index.html`：首页，显示官方模组（S1/S2/S4）和精选模组
+  - `assets/css/main.css`：深色 + 等宽字体 + 霓虹色风格
+  - `assets/js/api.js`：数据源用 jsDelivr，避免 raw.githubusercontent.com 国内不稳定
+  - `assets/js/render.js`：模组卡片和列表渲染
+  - `.nojekyll`：告诉 GitHub Pages 不用 Jekyll 处理
+- **GitHub Pages 部署**：`.github/workflows/deploy-web.yml`
+  - push 到 main 时自动部署 `web/` 目录
+  - 支持 `workflow_dispatch` 手动触发
+
+### 未完成
+
+- 模组列表页、详情页、模组集页（阶段二~四）
+- CLI 侧 `skilluno mod install` 命令
 
 ---
 
@@ -884,4 +907,4 @@ python -m unittest tests.test_mod_index
 
 ---
 
-最后更新：2026-10-07 · v1.9.0
+最后更新：2026-10-15 · v1.10.0

@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SkillUNO 模组商店</title>
+    <link rel="stylesheet" href="assets/css/main.css">
+</head>
+<body>
+    <header class="site-header">
+        <h1 class="logo">SkillUNO</h1>
+        <p class="tagline">// 模组商店 · 由社区驱动</p>
+    </header>
+
+    <main>
+        <section class="section">
+            <h2 class="section-title">
+                <span class="prompt">&gt;</span> 官方模组
+            </h2>
+            <div id="official-grid" class="mod-grid">
+                <p class="loading">加载中...</p>
+            </div>
+        </section>
+
+        <section class="section">
+            <h2 class="section-title">
+                <span class="prompt">&gt;</span> 精选模组
+            </h2>
+            <div id="handpicked-grid" class="mod-grid">
+                <p class="loading">加载中...</p>
+            </div>
+        </section>
+    </main>
+
+    <footer class="site-footer">
+        <a href="mods/index.html" class="btn-disabled" title="阶段二上线">
+            查看全部模组 →
+        </a>
+        <p class="footer-note">
+            数据源：jsDelivr · 仓库：SkillUNO
+        </p>
+    </footer>
+
+    <script src="assets/js/api.js"></script>
+    <script src="assets/js/render.js"></script>
+    <script>
+        (async function init() {
+            try {
+                const official = await loadOfficialMods();
+                renderModList(official, 'official-grid', 'official');
+
+                const index = await loadModIndex();
+                const files = [
+                    ...(index.handpicked || []),
+                    ...(index.other || []),
+                ];
+                const mods = await Promise.all(files.map(loadMod));
+                renderModList(mods, 'handpicked-grid', 'handpicked');
+            } catch (err) {
+                console.error(err);
+                document.getElementById('official-grid').innerHTML =
+                    '<p class="error">无法加载模组数据，请检查网络</p>';
+                document.getElementById('handpicked-grid').innerHTML =
+                    '<p class="error">无法加载模组数据，请检查网络</p>';
+            }
+        })();
+    </script>
+</body>
+</html>

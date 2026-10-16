@@ -1,4 +1,6 @@
 ![Python Tests](https://github.com/zhuyiming0208/SkillUNO/actions/workflows/test.yml/badge.svg)
+![PyPI](https://img.shields.io/pypi/v/skilluno.svg)
+![PyPI Downloads](https://img.shields.io/pypi/dm/skilluno.svg)
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)
 

@@ -30,6 +30,18 @@
                 <p class="loading">加载中...</p>
             </div>
         </section>
+
+        <section class="section">
+            <h2 class="section-title">
+                <span class="prompt">&gt;</span> 模组集
+            </h2>
+            <div id="collection-grid" class="mod-grid">
+                <p class="loading">加载中...</p>
+            </div>
+            <p class="section-more">
+                <a href="collections/index.html" class="btn-all-mods">查看更多模组集 →</a>
+            </p>
+        </section>
     </main>
 
     <footer class="site-footer">
@@ -41,7 +53,7 @@
         </p>
     </footer>
 
-    <script>window.DATA_ROOT = "mods/";</script>
+    <script>window.DATA_ROOT = "mods/"; window.COLLECTIONS_URL = "collections/collections.json";</script>
     <script src="assets/js/api.js"></script>
     <script src="assets/js/render.js"></script>
     <script>
@@ -63,6 +75,28 @@
                     '<p class="error">无法加载模组数据，请检查网络</p>';
                 document.getElementById('handpicked-grid').innerHTML =
                     '<p class="error">无法加载模组数据，请检查网络</p>';
+            }
+
+            // 模组集分区
+            try {
+                const cdata = await loadCollections();
+                const cols = (cdata.collections || []).slice(0, 3);
+                const cgrid = document.getElementById('collection-grid');
+                if (cols.length === 0) {
+                    cgrid.innerHTML = '<p class="empty">暂无模组集</p>';
+                } else {
+                    cgrid.innerHTML = cols.map(c => `
+                        <a class="collection-card" href="collections/detail.html?id=${encodeURIComponent(c.id)}">
+                            <h3>${escapeHtml(c.name || '未命名')}</h3>
+                            <p class="collection-count">${(c.mods || []).length} 个模组</p>
+                            ${c.description ? `<p class="desc">${escapeHtml(c.description)}</p>` : ''}
+                        </a>
+                    `).join('');
+                }
+            } catch (err) {
+                console.warn('模组集加载失败：', err);
+                document.getElementById('collection-grid').innerHTML =
+                    '<p class="error">无法加载模组集</p>';
             }
         })();
     </script>

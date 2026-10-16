@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>模组集 · SkillUNO</title>
+    <link rel="stylesheet" href="../../assets/css/main.css">
+</head>
+<body>
+    <header class="list-header">
+        <div class="list-header-row">
+            <a href="../index.html" class="back-link">← 返回首页</a>
+            <h1 class="list-title">模组集</h1>
+        </div>
+    </header>
+
+    <main>
+        <div id="collection-grid" class="mod-grid">
+            <p class="loading">加载中...</p>
+        </div>
+    </main>
+
+    <footer class="site-footer">
+        <p id="count-display" class="footer-note">共 0 个模组集</p>
+    </footer>
+
+    <script>window.COLLECTIONS_URL = "collections.json";</script>
+    <script src="../../assets/js/collections.js"></script>
+    <script>
+        (async function init() {
+            const grid = document.getElementById('collection-grid');
+            const countDisplay = document.getElementById('count-display');
+            try {
+                const data = await loadCollections();
+                const cols = data.collections || [];
+                if (cols.length === 0) {
+                    grid.innerHTML = '<p class="empty">暂无模组集</p>';
+                } else {
+                    grid.innerHTML = cols.map(renderCollectionCard).join('');
+                }
+                countDisplay.textContent = `共 ${cols.length} 个模组集`;
+            } catch (err) {
+                console.error(err);
+                grid.innerHTML = '<p class="error">无法加载模组集数据，请检查网络</p>';
+                countDisplay.textContent = '';
+            }
+        })();
+
+        function renderCollectionCard(coll) {
+            const id = coll.id || '?';
+            const name = coll.name || '未命名模组集';
+            const desc = coll.description || '';
+            const mods = coll.mods || [];
+            return `
+                <a class="collection-card" href="detail.html?id=${encodeURIComponent(id)}">
+                    <h3>${escapeHtml(name)}</h3>
+                    <p class="collection-count">${mods.length} 个模组</p>
+                    ${desc ? `<p class="desc">${escapeHtml(desc)}</p>` : ''}
+                </a>
+            `;
+        }
+    </script>
+</body>
+</html>

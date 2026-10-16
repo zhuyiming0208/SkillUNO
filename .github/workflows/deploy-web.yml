@@ -29,8 +29,9 @@ jobs:
 
       - name: Copy mod data into web
         run: |
-          mkdir -p web/mods
+          mkdir -p web/mods web/collections
           cp mods/*.json web/mods/
+          cp mods/collections.json web/collections/
 
       - uses: actions/configure-pages@v4
 

@@ -1,0 +1,17 @@
+{
+  "version": "1.0.0",
+  "collections": [
+    {
+      "id": "NEWBIE_PACK",
+      "name": "新手推荐包",
+      "description": "适合新玩家的入门模组组合，包含经典赛季和示例模组。",
+      "mods": ["S1", "EXAMPLE"]
+    },
+    {
+      "id": "PASSIVE_PACK",
+      "name": "被动觉醒精选",
+      "description": "以被动技为核心的进阶组合，适合喜欢策略博弈的玩家。",
+      "mods": ["S2", "S4"]
+    }
+  ]
+}

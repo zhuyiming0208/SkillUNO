@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>模组集详情 · SkillUNO</title>
+    <link rel="stylesheet" href="../../assets/css/main.css">
+</head>
+<body>
+    <header class="list-header">
+        <div class="list-header-row">
+            <a href="index.html" class="back-link">← 返回模组集列表</a>
+            <h1 class="list-title">模组集详情</h1>
+        </div>
+    </header>
+
+    <main>
+        <div id="detail-container" class="detail-wrap">
+            <p class="loading">加载中...</p>
+        </div>
+    </main>
+
+    <footer class="site-footer">
+        <p class="footer-note">
+            <a href="../index.html" class="back-link">← 返回首页</a>
+        </p>
+    </footer>
+
+    <script>window.DATA_ROOT = "../mods/";</script>
+    <script>window.COLLECTIONS_URL = "collections.json";</script>
+    <script src="../../assets/js/api.js"></script>
+    <script src="../../assets/js/render.js"></script>
+    <script src="../../assets/js/collections.js"></script>
+    <script src="../../assets/js/copy.js"></script>
+    <script>
+        (async function init() {
+            const container = document.getElementById('detail-container');
+            const collId = new URLSearchParams(location.search).get('id');
+
+            if (!collId) {
+                container.innerHTML = errorState('缺少模组集 ID 参数');
+                return;
+            }
+
+            let coll;
+            try {
+                coll = await findCollectionById(collId);
+            } catch (err) {
+                console.error(err);
+                container.innerHTML = errorState('无法加载模组集数据，请检查网络');
+                return;
+            }
+
+            if (!coll) {
+                container.innerHTML = errorState(`未找到该模组集：${escapeHtml(collId)}`);
+                return;
+            }
+
+            const mods = await loadModsByIds(coll.mods || []);
+            container.innerHTML = renderCollectionDetail(coll, mods);
+
+            const btn = document.getElementById('copy-install-btn');
+            if (btn) {
+                btn.addEventListener('click', () => {
+                    const cmd = `skilluno mod install --collection ${coll.id}`;
+                    copyToClipboard(cmd).then(
+                        () => showCopyToast('已复制到剪贴板'),
+                        () => showCopyToast('复制失败，请手动复制')
+                    );
+                });
+            }
+        })();
+
+        function errorState(msg) {
+            return `
+                <div class="detail-error">
+                    <p class="error">${msg}</p>
+                    <p><a href="index.html" class="back-link">← 返回模组集列表</a></p>
+                </div>
+            `;
+        }
+
+        function renderCollectionDetail(coll, mods) {
+            const name = coll.name || '未命名模组集';
+            const desc = coll.description || '（无描述）';
+            const count = (coll.mods || []).length;
+
+            const modsHtml = mods.map(m => {
+                if (m._missing) {
+                    return `
+                        <div class="mod-in-collection missing">
+                            <span class="mod-in-name">${escapeHtml(m.ID)}</span>
+                            <span class="badge-missing">未收录</span>
+                        </div>
+                    `;
+                }
+                const modId = m.ID || m.id;
+                const modName = m.name || '未命名模组';
+                const author = m.author || '匿名';
+                const version = m.version || '?';
+                const official = isOfficialMod(modId);
+                const badge = official
+                    ? '<span class="badge-official">官方</span>'
+                    : '<span class="badge-thirdparty">第三方</span>';
+                return `
+                    <a class="mod-in-collection" href="../mods/detail.html?id=${encodeURIComponent(modId)}">
+                        <span class="mod-in-name">${escapeHtml(modName)}</span>
+                        <span class="mod-in-meta">by ${escapeHtml(author)} · v${escapeHtml(version)}</span>
+                        ${badge}
+                    </a>
+                `;
+            }).join('');
+
+            return `
+                <div class="detail-card">
+                    <h1 class="detail-name">${escapeHtml(name)}</h1>
+                    <p class="collection-count">${count} 个模组</p>
+                    <p class="detail-desc">${escapeHtml(desc)}</p>
+                </div>
+
+                <div class="detail-section">
+                    <h2 class="detail-section-title">&gt; 包含模组</h2>
+                    <div class="collection-mod-list">${modsHtml}</div>
+                </div>
+
+                <div class="install-section">
+                    <h2 class="detail-section-title">&gt; 一键安装</h2>
+                    <p class="install-hint">在终端运行以下命令安装整包：</p>
+                    <div class="install-cmd-row">
+                        <code class="install-cmd">skilluno mod install --collection ${escapeHtml(coll.id)}</code>
+                        <button id="copy-install-btn" class="copy-btn" type="button">复制</button>
+                    </div>
+                    <p class="install-note">重启游戏后生效</p>
+                </div>
+            `;
+        }
+    </script>
+</body>
+</html>

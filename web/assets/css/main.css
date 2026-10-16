@@ -563,3 +563,125 @@ body {
         width: 100%;
     }
 }
+
+/* ========== 模组集（阶段四） ========== */
+.collection-card {
+    display: block;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--yellow);
+    padding: 1.2rem 1.4rem;
+    text-decoration: none;
+    color: var(--fg);
+    transition: all 0.15s ease;
+}
+
+.collection-card:hover {
+    border-left-color: var(--magenta);
+    background: var(--bg-elev);
+    box-shadow: 0 0 12px rgba(255, 0, 255, 0.15);
+    transform: translateY(-2px);
+}
+
+.collection-card h3 {
+    font-size: 1.1rem;
+    color: var(--yellow);
+    margin-bottom: 0.4rem;
+}
+
+.collection-card:hover h3 {
+    color: var(--magenta);
+}
+
+.collection-count {
+    font-size: 0.85rem;
+    color: var(--cyan);
+    margin-bottom: 0.4rem;
+}
+
+.section-more {
+    margin-top: 1rem;
+    text-align: right;
+}
+
+/* ========== 模组集详情：模组列表 ========== */
+.collection-mod-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.mod-in-collection {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    padding: 0.7rem 1rem;
+    background: var(--bg-elev);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--cyan);
+    text-decoration: none;
+    color: var(--fg);
+    transition: all 0.15s ease;
+    flex-wrap: wrap;
+}
+
+.mod-in-collection:hover {
+    border-left-color: var(--magenta);
+    background: var(--bg-card);
+}
+
+.mod-in-collection.missing {
+    border-left-color: var(--fg-dim);
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+.mod-in-name {
+    color: var(--cyan);
+    font-weight: 500;
+    flex: 1;
+    min-width: 8em;
+}
+
+.mod-in-collection:hover .mod-in-name {
+    color: var(--magenta);
+}
+
+.mod-in-collection.missing .mod-in-name {
+    color: var(--fg-dim);
+}
+
+.mod-in-meta {
+    font-size: 0.8rem;
+    color: var(--fg-dim);
+}
+
+/* ========== 徽章 ========== */
+.badge-official,
+.badge-thirdparty,
+.badge-missing {
+    display: inline-block;
+    padding: 2px 8px;
+    font-size: 0.72rem;
+    border-radius: 8px;
+    border: 1px solid;
+    white-space: nowrap;
+}
+
+.badge-official {
+    color: var(--cyan);
+    border-color: var(--cyan);
+    background: rgba(0, 217, 255, 0.1);
+}
+
+.badge-thirdparty {
+    color: var(--magenta);
+    border-color: var(--magenta);
+    background: rgba(255, 0, 255, 0.1);
+}
+
+.badge-missing {
+    color: var(--fg-dim);
+    border-color: var(--fg-dim);
+    background: transparent;
+}

@@ -80,7 +80,7 @@ class MainMenu:
         lines.append("")
 
         # 操作栏
-        bar = "u/d 选择 | Enter 详情 | S 搜索 | H 历史 | Q 退出"
+        bar = "u/d 选择 | Enter 详情 | S 搜索 | H 历史 | W 网页版 | Q 退出"
         lines.append(colorize(bar, "dim"))
 
         return draw_box(lines, self.BOX_WIDTH)
@@ -126,6 +126,8 @@ class MainMenu:
             return Action.HISTORY
         if key.type == ih.EventType.CHAR and key.char:
             ch = key.char.lower()
+            if ch == "w":
+                return Action.OPEN_WEB
             if ch == "u":
                 mod = self.current_mod()
                 if mod is None:

@@ -15,6 +15,7 @@ class Action:
     UPDATE = "UPDATE"
     TOGGLE_ENABLE = "TOGGLE_ENABLE"
     UNINSTALL_CONFIRM = "UNINSTALL_CONFIRM"
+    OPEN_WEB = "OPEN_WEB"
     COLLECTION = "COLLECTION"
     INSTALL_ALL = "INSTALL_ALL"
 
@@ -142,6 +143,12 @@ class Router:
             return
         if action == "KEEP_PENDING":
             self._handle_keep_pending()
+            return
+
+        if action == Action.OPEN_WEB:
+            from uno.mod_store.web_open import open_web_store
+            _ok, _msg = open_web_store()
+            self.push(MessagePage(_msg))
             return
         return
 

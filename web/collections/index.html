@@ -27,6 +27,7 @@
     </main>
 
     <footer class="site-footer">
+        <p id="count-display" class="footer-note">共 0 个模组集</p>
         <p class="footer-note">
             SkillUNO 模组商店 ·
             <a href="https://github.com/zhuyiming0208/SkillUNO">GitHub</a> ·
@@ -52,7 +53,8 @@
                 countDisplay.textContent = `共 ${cols.length} 个模组集`;
             } catch (err) {
                 console.error(err);
-                grid.innerHTML = '<p class="error">无法加载模组集数据，请检查网络</p>';
+                grid.innerHTML = '<p class="error">加载失败：' +
+                    (err && err.message ? err.message : String(err)) + '</p>';
                 countDisplay.textContent = '';
             }
         })();

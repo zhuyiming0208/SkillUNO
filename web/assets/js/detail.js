@@ -10,7 +10,15 @@ function getModIdFromUrl() {
  * 兼容 ID（大写）/ id（官方）
  */
 async function findModById(modId) {
-    // loadAllMods 已包含官方 + 第三方，并按 ID 去重
+    // 1. 优先直接读 web/mods/{modId}.json（官方和第三方统一处理）
+    try {
+        const mod = await loadMod(`${modId}.json`);
+        if (mod) return mod;
+    } catch (e) {
+        // 404 或其他错误，继续往下查
+    }
+
+    // 2. fallback：从 loadAllMods 里找
     const all = await loadAllMods();
     return all.find(m => (m.ID || m.id) === modId) || null;
 }

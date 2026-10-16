@@ -151,9 +151,34 @@ class ModIndex:
         return result
 
     # ---------- 官方模组 ----------
-    def get_official(self) -> List[Dict]:
-        """获取官方内建模组列表（深拷贝，防止外部污染常量）。"""
+    def get_official(self):
+        """获取官方内建模组列表。
+
+        数据源：mods/official.json 的 mods 数组（文件名列表）。
+        每个文件名走 load_mod 加载完整元数据，附加 builtin=True。
+        若 official.json 不存在或加载失败，回退到旧硬编码。
+        """
+        official_file = os.path.join(self.mods_dir, "official.json")
+        result = []
+        if os.path.isfile(official_file):
+            try:
+                with open(official_file, "r", encoding="utf-8-sig") as f:
+                    data = json.load(f)
+                files = data.get("mods", []) if isinstance(data, dict) else []
+                for filename in files:
+                    mod = self.load_mod(filename)
+                    if mod is None:
+                        continue
+                    mod = dict(mod)  # 浅拷贝，避免污染 load_mod 的返回值
+                    mod["builtin"] = True
+                    result.append(mod)
+                if result:
+                    return result
+            except (json.JSONDecodeError, OSError):
+                pass
+        # 回退：旧硬编码（保证向后兼容）
         return copy.deepcopy(OFFICIAL_MODS)
+
 
     def get_by_id(self, mod_id):
         """按 ID 查找模组元数据。大小写敏感。未找到返回 None。

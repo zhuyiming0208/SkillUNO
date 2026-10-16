@@ -233,7 +233,7 @@ class TestOfficialMods:
 
     def test_get_official_ids(self, real_mods_dir):
         idx = ModIndex(mods_dir=real_mods_dir)
-        ids = {m["id"] for m in idx.get_official()}
+        ids = {(m.get("ID") or m.get("id")) for m in idx.get_official()}
         assert ids == {"S1", "S2", "S3", "S4"}
 
     def test_get_official_all_builtin(self, real_mods_dir):

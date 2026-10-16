@@ -5,7 +5,7 @@
       "id": "NEWBIE_PACK",
       "name": "新手推荐包",
       "description": "适合新玩家的入门模组组合，包含经典赛季和示例模组。",
-      "mods": ["S1", "EXAMPLE"]
+      "mods": ["S1", "example"]
     },
     {
       "id": "PASSIVE_PACK",

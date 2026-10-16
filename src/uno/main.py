@@ -4,7 +4,7 @@ from uno.replay import GameRecorder, GameReplayer
 from uno.ui import ConsoleUI
 from uno.paths import find_mods_dir
 
-VERSION = "v1.10.2"
+VERSION = "v1.11.0"
 
 def main():
     print(f"欢迎来到 SkillUNO {VERSION}！")
@@ -131,5 +131,18 @@ def cli():
         # 其他输入 → 回到菜单
 
 
+def cli_entry():
+    """根据 argv 分发：有 mod 子命令走 CLI，否则进交互菜单。"""
+    import sys
+    argv = sys.argv[1:]
+    if argv and argv[0] == 'mod':
+        from uno.mod_store.cli import run_cli
+        from uno.paths import find_mods_dir
+        mods_dir = find_mods_dir()
+        sys.exit(run_cli(argv[1:], mods_dir=str(mods_dir)))
+    else:
+        cli()
+
+
 if __name__ == "__main__":
-    cli()
+    cli_entry()

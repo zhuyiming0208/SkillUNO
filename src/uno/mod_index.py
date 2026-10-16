@@ -30,8 +30,8 @@ REQUIRED_FIELDS = [
 OFFICIAL_MODS = [
     {"id": "S1", "name": "经典赛季", "skills": 16, "builtin": True},
     {"id": "S2", "name": "被动觉醒", "skills": 8, "builtin": True},
-    {"id": "S4", "name": "补丁赛季", "skills": 8, "builtin": True},
     {"id": "S3", "name": "同盟赛季", "skills": 0, "builtin": True},
+    {"id": "S4", "name": "补丁赛季", "skills": 8, "builtin": True},
 ]
 
 # 索引文件缺省值
@@ -156,7 +156,27 @@ class ModIndex:
         return copy.deepcopy(OFFICIAL_MODS)
 
     def get_by_id(self, mod_id):
-        """按 ID 查找模组元数据。大小写敏感。未找到返回 None。"""
+        """按 ID 查找模组元数据。大小写敏感。未找到返回 None。
+
+        查找顺序：
+          1. 官方模组：若 id 在 official.json 的 mods 列表里，加载 {id}.json
+          2. 第三方：遍历 mod_idx.json 里的 handpicked + other
+        """
+        # 1. 官方
+        official_file = os.path.join(self.mods_dir, "official.json")
+        if os.path.isfile(official_file):
+            try:
+                with open(official_file, "r", encoding="utf-8-sig") as f:
+                    off_data = json.load(f)
+                file_list = off_data.get("mods", []) if isinstance(off_data, dict) else []
+                if f"{mod_id}.json" in file_list:
+                    mod = self.load_mod(f"{mod_id}.json")
+                    if mod is not None:
+                        return mod
+            except (json.JSONDecodeError, OSError):
+                pass
+
+        # 2. 第三方
         for mod in self.get_all():
             if mod.get("ID") == mod_id:
                 return mod

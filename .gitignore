@@ -23,7 +23,6 @@ mods/history.json
 mods/history.json.tmp
 mods/enabled.json
 mods/enabled.json.tmp
-mods/collections.json
 mods/collections.json.tmp
 
 # Web 构建产物：由 CI 从 mods/ 复制，不入库

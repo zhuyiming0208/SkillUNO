@@ -685,3 +685,114 @@ body {
     border-color: var(--fg-dim);
     background: transparent;
 }
+
+/* ============================================================
+   阶段五：视觉统一 + 响应式 + 状态完善
+   ============================================================ */
+
+/* ---------- 1.1 卡片终端风 ---------- */
+.mod-card, .collection-card {
+    border-radius: 0;
+}
+.mod-card:hover, .collection-card:hover {
+    border-color: var(--cyan);
+    box-shadow: 0 0 8px rgba(0, 217, 255, 0.3);
+}
+
+/* ---------- 1.2 按钮 [ 文字 ] 样式 ---------- */
+.copy-btn, .btn-all-mods {
+    border: none;
+    background: transparent;
+    color: var(--cyan);
+    font-family: inherit;
+    padding: 8px 12px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: background 0.15s ease;
+}
+.copy-btn::before, .btn-all-mods::before { content: '[ '; color: var(--yellow); }
+.copy-btn::after,  .btn-all-mods::after  { content: ' ]'; color: var(--yellow); }
+.copy-btn:hover, .btn-all-mods:hover {
+    background: rgba(0, 217, 255, 0.1);
+    color: var(--magenta);
+}
+.copy-btn:active, .btn-all-mods:active { transform: scale(0.97); }
+
+/* ---------- 1.3 链接霓虹下划线 ---------- */
+a:not(.mod-card):not(.collection-card):not(.mod-in-collection):not(.back-link):not(.btn-all-mods) {
+    color: var(--cyan);
+    text-decoration: none;
+    border-bottom: 1px dashed rgba(0, 217, 255, 0.5);
+}
+a:not(.mod-card):not(.collection-card):not(.mod-in-collection):not(.back-link):not(.btn-all-mods):hover {
+    color: var(--magenta);
+    border-bottom-color: var(--magenta);
+}
+
+/* ---------- 2. 响应式 ---------- */
+.mod-grid { grid-template-columns: repeat(3, 1fr); }
+@media (max-width: 1024px) {
+    .mod-grid { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 640px) {
+    .mod-grid { grid-template-columns: 1fr; gap: 12px; }
+    .list-header-row { flex-direction: column; align-items: flex-start; gap: 8px; }
+    .search-wrapper { width: 100%; }
+    body { padding: 0 12px; }
+    .logo { font-size: 1.4rem; }
+    .list-title { font-size: 1.1rem; }
+    .detail-name { font-size: 1.25rem; }
+}
+
+/* ---------- 3. 加载动画 ---------- */
+.loading .dots::after {
+    content: '';
+    animation: dots 1.2s steps(4, end) infinite;
+}
+@keyframes dots {
+    0%   { content: ''; }
+    25%  { content: '.'; }
+    50%  { content: '..'; }
+    75%  { content: '...'; }
+}
+
+/* ---------- 4. 错误/空状态统一 ---------- */
+.empty, .error, .loading {
+    text-align: center;
+    padding: 40px 20px;
+    font-family: inherit;
+    color: var(--fg-dim);
+}
+.error { color: #ff5555; }
+.error::before { content: '✗ '; color: #ff5555; }
+.empty::before { content: '○ '; color: var(--fg-dim); }
+
+/* ---------- 5. 404 页面 ---------- */
+.error-page {
+    min-height: 60vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    padding: 2rem;
+}
+.error-page h1 {
+    font-size: 4rem;
+    color: var(--cyan);
+    text-shadow: 0 0 12px rgba(0, 217, 255, 0.5);
+    margin-bottom: 1rem;
+}
+.error-page p { margin: 0.5rem 0; color: var(--fg-dim); }
+
+/* ---------- 9. 移动端触摸 ---------- */
+@media (max-width: 640px) {
+    .mod-card, .collection-card, .mod-in-collection,
+    .copy-btn, .btn-all-mods, .back-link {
+        min-height: 44px;
+    }
+    .mod-card, .collection-card { padding: 1rem 1rem; }
+    .search-box { font-size: 16px; }
+    input { font-size: 16px; }
+    .meta-row { gap: 0.15rem; }
+}

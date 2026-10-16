@@ -4,9 +4,11 @@
 
 /**
  * 单个模组卡片 → HTML 字符串
- * 兼容两种 id 键名：ID（大写） / id（官方模组）
+ * basePath: 用于拼接详情页链接的前缀
+ *   首页调用：renderModCard(mod)       → mods/detail.html?id=xxx
+ *   列表页调用：renderModCard(mod, '../') → ../mods/detail.html?id=xxx
  */
-function renderModCard(mod) {
+function renderModCard(mod, basePath = '') {
     const modId = mod.ID || mod.id || '?';
     const name = mod.name || '未命名模组';
     const author = mod.author || '匿名';
@@ -17,10 +19,9 @@ function renderModCard(mod) {
         ? '<span class="builtin-badge">内置</span>'
         : '';
 
-    // 官方模组暂时没有详情页，用 # 占位
     const href = mod.builtin
         ? '#'
-        : `mods/detail.html?id=${encodeURIComponent(modId)}`;
+        : `${basePath}mods/detail.html?id=${encodeURIComponent(modId)}`;
 
     return `
         <a class="mod-card" href="${href}">
@@ -36,7 +37,7 @@ function renderModCard(mod) {
 /**
  * 渲染模组列表到指定容器
  */
-function renderModList(mods, containerId) {
+function renderModList(mods, containerId, basePath = '') {
     const container = document.getElementById(containerId);
     if (!container) return;
 
@@ -44,7 +45,7 @@ function renderModList(mods, containerId) {
         container.innerHTML = '<p class="loading">暂无模组</p>';
         return;
     }
-    container.innerHTML = mods.map(renderModCard).join('');
+    container.innerHTML = mods.map(m => renderModCard(m, basePath)).join('');
 }
 
 /**

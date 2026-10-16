@@ -211,3 +211,126 @@ body {
     font-size: 0.75rem;
     margin-top: 0.8rem;
 }
+
+/* ========== 列表页 Header ========== */
+.list-header {
+    padding: 1.2rem 0 1rem;
+    border-bottom: 1px dashed var(--border);
+    margin-bottom: 2rem;
+}
+
+.list-header-row {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+}
+
+.back-link {
+    color: var(--cyan);
+    text-decoration: none;
+    font-size: 0.9rem;
+    white-space: nowrap;
+    transition: all 0.15s ease;
+}
+
+.back-link:hover {
+    color: var(--magenta);
+    text-shadow: 0 0 8px rgba(255, 0, 255, 0.5);
+}
+
+.list-title {
+    font-size: 1.3rem;
+    color: var(--fg);
+    letter-spacing: 1px;
+    flex-shrink: 0;
+}
+
+.search-wrapper {
+    position: relative;
+    margin-left: auto;
+    width: 300px;
+}
+
+.search-box {
+    width: 100%;
+    background: var(--bg-card);
+    color: var(--fg);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--cyan);
+    padding: 0.55rem 2rem 0.55rem 0.8rem;
+    font-family: var(--mono);
+    font-size: 0.9rem;
+    outline: none;
+    transition: all 0.15s ease;
+}
+
+.search-box::placeholder {
+    color: var(--fg-dim);
+}
+
+.search-box:focus {
+    border-left-color: var(--magenta);
+    box-shadow: 0 0 10px rgba(255, 0, 255, 0.2);
+}
+
+.clear-btn {
+    position: absolute;
+    right: 0.4rem;
+    top: 50%;
+    transform: translateY(-50%);
+    background: transparent;
+    color: var(--fg-dim);
+    border: none;
+    font-size: 1.2rem;
+    cursor: pointer;
+    padding: 0 0.4rem;
+    line-height: 1;
+    font-family: var(--mono);
+}
+
+.clear-btn:hover {
+    color: var(--red);
+}
+
+/* ========== 空结果 ========== */
+.empty {
+    grid-column: 1 / -1;
+    text-align: center;
+    color: var(--fg-dim);
+    padding: 3rem 0;
+    font-size: 1rem;
+}
+
+/* ========== 首页"查看全部模组"按钮（阶段二上线） ========== */
+.btn-all-mods {
+    display: inline-block;
+    padding: 0.5rem 1.2rem;
+    border: 1px solid var(--cyan);
+    color: var(--cyan);
+    text-decoration: none;
+    font-size: 0.9rem;
+    transition: all 0.15s ease;
+}
+
+.btn-all-mods:hover {
+    background: rgba(0, 217, 255, 0.1);
+    box-shadow: 0 0 12px rgba(0, 217, 255, 0.3);
+    color: var(--magenta);
+    border-color: var(--magenta);
+}
+
+/* ========== 响应式 ========== */
+@media (max-width: 768px) {
+    .list-header-row {
+        flex-wrap: wrap;
+        gap: 0.8rem;
+    }
+    .list-title {
+        flex: 1 0 100%;
+        order: -1;
+    }
+    .search-wrapper {
+        width: 100%;
+        margin-left: 0;
+    }
+}

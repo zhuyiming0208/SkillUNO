@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>全部模组 · SkillUNO</title>
+    <link rel="stylesheet" href="../assets/css/main.css">
+</head>
+<body>
+    <header class="list-header">
+        <div class="list-header-row">
+            <a href="../index.html" class="back-link">← 返回首页</a>
+            <h1 class="list-title">全部模组</h1>
+            <div class="search-wrapper">
+                <input type="text" id="search-box" class="search-box"
+                       placeholder="搜索模组名、作者、标签..." autocomplete="off">
+                <button type="button" id="clear-btn" class="clear-btn" hidden>×</button>
+            </div>
+        </div>
+    </header>
+
+    <main>
+        <div id="mod-grid" class="mod-grid">
+            <p class="loading">加载中...</p>
+        </div>
+    </main>
+
+    <footer class="site-footer">
+        <p id="count-display" class="footer-note">共 0 个模组</p>
+    </footer>
+
+    <script src="../assets/js/api.js"></script>
+    <script src="../assets/js/render.js"></script>
+    <script src="../assets/js/search.js"></script>
+    <script>
+        (async function init() {
+            const grid = document.getElementById('mod-grid');
+            const searchBox = document.getElementById('search-box');
+            const clearBtn = document.getElementById('clear-btn');
+            const countDisplay = document.getElementById('count-display');
+
+            // --- URL 参数恢复 ---
+            const params = new URLSearchParams(location.search);
+            const initialQ = params.get('q') || '';
+            searchBox.value = initialQ;
+            if (initialQ) clearBtn.hidden = false;
+
+            // --- 数据加载 ---
+            let allMods = [];
+            try {
+                allMods = await loadAllMods();
+            } catch (err) {
+                console.error(err);
+                grid.innerHTML = '<p class="error">无法加载模组数据，请检查网络</p>';
+                countDisplay.textContent = '';
+                return;
+            }
+
+            // --- 更新视图 ---
+            function update(mods, keyword) {
+                if (mods.length === 0) {
+                    grid.innerHTML = '<p class="empty">未找到匹配的模组</p>';
+                } else {
+                    renderModList(mods, 'mod-grid', '../');
+                }
+                countDisplay.textContent = `共 ${mods.length} 个模组`;
+
+                if (keyword && keyword.trim()) {
+                    history.replaceState(null, '', `?q=${encodeURIComponent(keyword)}`);
+                } else {
+                    history.replaceState(null, '', location.pathname);
+                }
+            }
+
+            function apply(keyword) {
+                const filtered = filterMods(allMods, keyword);
+                update(filtered, keyword);
+            }
+
+            // --- 初始渲染 ---
+            apply(initialQ);
+
+            // --- 输入事件（防抖 200ms）---
+            const debouncedApply = debounce(apply, 200);
+            searchBox.addEventListener('input', (e) => {
+                clearBtn.hidden = !e.target.value;
+                debouncedApply(e.target.value);
+            });
+
+            // --- 清空按钮 ---
+            clearBtn.addEventListener('click', () => {
+                searchBox.value = '';
+                clearBtn.hidden = true;
+                apply('');
+                searchBox.focus();
+            });
+
+            // --- 阻止回车默认行为 ---
+            searchBox.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') e.preventDefault();
+            });
+        })();
+    </script>
+</body>
+</html>

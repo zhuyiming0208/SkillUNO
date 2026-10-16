@@ -33,7 +33,7 @@
     </main>
 
     <footer class="site-footer">
-        <a href="mods/index.html" class="btn-disabled" title="阶段二上线">
+        <a href="mods/index.html" class="btn-all-mods">
             查看全部模组 →
         </a>
         <p class="footer-note">
@@ -47,7 +47,7 @@
         (async function init() {
             try {
                 const official = await loadOfficialMods();
-                renderModList(official, 'official-grid', 'official');
+                renderModList(official, 'official-grid');
 
                 const index = await loadModIndex();
                 const files = [
@@ -55,7 +55,7 @@
                     ...(index.other || []),
                 ];
                 const mods = await Promise.all(files.map(loadMod));
-                renderModList(mods, 'handpicked-grid', 'handpicked');
+                renderModList(mods, 'handpicked-grid');
             } catch (err) {
                 console.error(err);
                 document.getElementById('official-grid').innerHTML =

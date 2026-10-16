@@ -20,7 +20,7 @@ function renderModCard(mod, basePath = '') {
         : '';
 
     const href = mod.builtin
-        ? '#'
+        ? `${basePath}mods/detail.html?id=${modId}`
         : `${basePath}mods/detail.html?id=${encodeURIComponent(modId)}`;
 
     return `
@@ -59,4 +59,38 @@ function escapeHtml(s) {
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#39;');
+}
+
+/* ========== 详情页渲染工具（阶段三追加） ========== */
+
+/**
+ * 渲染 tags 徽章列表
+ */
+function renderTags(tags) {
+    if (!tags || tags.length === 0) return '';
+    return tags.map(t => `<span class="tag">${escapeHtml(t)}</span>`).join('');
+}
+
+/**
+ * 渲染关系对象（rely_on / reject，value 是原因字符串）
+ */
+function renderRelations(obj) {
+    if (!obj || Object.keys(obj).length === 0) {
+        return '<span class="muted">无</span>';
+    }
+    return Object.entries(obj)
+        .map(([k, v]) =>
+            `<div class="relation-item"><code>${escapeHtml(k)}</code>：${escapeHtml(v)}</div>`
+        )
+        .join('');
+}
+
+/**
+ * 渲染字符串数组（only_tolerate / needs）
+ */
+function renderStringList(arr, emptyText = '无') {
+    if (!arr || arr.length === 0) {
+        return `<span class="muted">${emptyText}</span>`;
+    }
+    return arr.map(s => `<code>${escapeHtml(s)}</code>`).join(' ');
 }

@@ -334,3 +334,232 @@ body {
         margin-left: 0;
     }
 }
+
+/* ========== 详情页（阶段三） ========== */
+.detail-wrap {
+    max-width: 900px;
+    margin: 0 auto;
+}
+
+.detail-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--cyan);
+    padding: 1.5rem 1.8rem;
+    margin-bottom: 1.5rem;
+}
+
+.detail-name {
+    font-size: 1.6rem;
+    color: var(--cyan);
+    margin-bottom: 0.6rem;
+    letter-spacing: 1px;
+}
+
+.detail-tags {
+    margin-bottom: 1rem;
+}
+
+.tag {
+    display: inline-block;
+    padding: 2px 10px;
+    margin: 0 6px 6px 0;
+    font-size: 0.75rem;
+    color: var(--cyan);
+    border: 1px solid var(--cyan);
+    border-radius: 10px;
+    background: rgba(0, 217, 255, 0.08);
+}
+
+.detail-meta-grid {
+    margin-top: 0.8rem;
+}
+
+.meta-row {
+    display: flex;
+    gap: 0.8rem;
+    margin: 0.4rem 0;
+    align-items: baseline;
+}
+
+.meta-label {
+    color: var(--yellow);
+    font-size: 0.85rem;
+    min-width: 4em;
+    flex-shrink: 0;
+}
+
+.meta-value {
+    color: var(--fg);
+    font-size: 0.9rem;
+    word-break: break-all;
+}
+
+.meta-value a {
+    color: var(--cyan);
+    text-decoration: none;
+    border-bottom: 1px dotted var(--cyan);
+}
+
+.meta-value a:hover {
+    color: var(--magenta);
+    border-bottom-color: var(--magenta);
+}
+
+.detail-section {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    padding: 1.2rem 1.8rem;
+    margin-bottom: 1rem;
+}
+
+.detail-section-title {
+    font-size: 1rem;
+    color: var(--yellow);
+    margin-bottom: 0.8rem;
+    letter-spacing: 1px;
+}
+
+.detail-desc {
+    color: var(--fg);
+    line-height: 1.7;
+    white-space: pre-wrap;
+}
+
+.relation-item {
+    padding: 0.2rem 0;
+    font-size: 0.9rem;
+}
+
+.muted {
+    color: var(--fg-dim);
+    font-style: italic;
+}
+
+.detail-section code {
+    background: var(--bg-elev);
+    color: var(--cyan);
+    padding: 1px 6px;
+    margin: 0 3px;
+    border-radius: 3px;
+    font-size: 0.85rem;
+}
+
+/* ========== 安装区 ========== */
+.install-section {
+    background: var(--bg-elev);
+    border: 1px solid var(--green);
+    border-left: 4px solid var(--green);
+    padding: 1.4rem 1.8rem;
+    margin-bottom: 2rem;
+}
+
+.install-hint {
+    color: var(--fg-dim);
+    font-size: 0.85rem;
+    margin-bottom: 0.8rem;
+}
+
+.install-cmd-row {
+    display: flex;
+    gap: 0.6rem;
+    align-items: center;
+    margin-bottom: 0.6rem;
+    flex-wrap: wrap;
+}
+
+.install-cmd {
+    flex: 1;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    padding: 0.6rem 0.9rem;
+    font-size: 0.95rem;
+    color: var(--green);
+    overflow-x: auto;
+    white-space: nowrap;
+    min-width: 200px;
+}
+
+.copy-btn {
+    background: transparent;
+    color: var(--green);
+    border: 1px solid var(--green);
+    padding: 0.55rem 1.2rem;
+    font-family: var(--mono);
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    white-space: nowrap;
+}
+
+.copy-btn:hover {
+    background: rgba(63, 185, 80, 0.12);
+    box-shadow: 0 0 10px rgba(63, 185, 80, 0.3);
+}
+
+.copy-btn:active {
+    transform: scale(0.97);
+}
+
+.install-note {
+    color: var(--fg-dim);
+    font-size: 0.8rem;
+}
+
+/* ========== 复制 toast ========== */
+.copy-toast {
+    position: fixed;
+    left: 50%;
+    bottom: 2rem;
+    transform: translateX(-50%) translateY(20px);
+    background: var(--bg-elev);
+    color: var(--green);
+    border: 1px solid var(--green);
+    padding: 0.6rem 1.2rem;
+    font-size: 0.9rem;
+    font-family: var(--mono);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s ease, transform 0.25s ease;
+    z-index: 999;
+}
+
+.copy-toast.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+}
+
+/* ========== 详情错误态 ========== */
+.detail-error {
+    text-align: center;
+    padding: 3rem 1rem;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+}
+
+.detail-error .error {
+    color: var(--red);
+    margin-bottom: 1rem;
+}
+
+@media (max-width: 600px) {
+    .detail-card,
+    .detail-section,
+    .install-section {
+        padding: 1rem 1.1rem;
+    }
+    .detail-name {
+        font-size: 1.3rem;
+    }
+    .meta-row {
+        flex-direction: column;
+        gap: 0.2rem;
+    }
+    .install-cmd-row {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    .copy-btn {
+        width: 100%;
+    }
+}

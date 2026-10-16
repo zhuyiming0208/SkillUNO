@@ -1,0 +1,21 @@
+{
+  "ID": "S1",
+  "name": "经典赛季",
+  "description": "SkillUNO 首个官方赛季，包含破万法、巧物、生生不息、储能、强运、离析、化形、祸水、不灭、无间道、读心、癫人、招灾、惊雷、浓烟等经典技能。",
+  "author": "SkillUNO 官方",
+  "author_github": "zhuyiming0208",
+  "repo": "https://github.com/zhuyiming0208/SkillUNO",
+  "license": "MIT",
+  "version": "1.0.0",
+  "micover": "1.0.0",
+  "lacover": null,
+  "skills": 16,
+  "achievements": 0,
+  "needs": ["core.Skill"],
+  "rely_on": {},
+  "reject": {},
+  "only_tolerate": [],
+  "tags": ["官方", "内置"],
+  "created_at": "2026-10-16",
+  "updated_at": "2026-10-16"
+}

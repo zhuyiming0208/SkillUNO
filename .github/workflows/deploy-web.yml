@@ -6,6 +6,7 @@ on:
     paths:
       - 'web/**'
       - 'mods/**'
+      - '.github/workflows/deploy-web.yml'
   workflow_dispatch:
 
 permissions:
@@ -25,9 +26,17 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
+
+      - name: Copy mod data into web
+        run: |
+          mkdir -p web/mods
+          cp mods/*.json web/mods/
+
       - uses: actions/configure-pages@v4
+
       - uses: actions/upload-pages-artifact@v3
         with:
           path: 'web'
+
       - id: deployment
         uses: actions/deploy-pages@v4

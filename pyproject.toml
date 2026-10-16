@@ -4,7 +4,7 @@ version = "1.12.1"
 description = "一个基于 Python 的 UNO 卡牌游戏框架"
 readme = "README.md"
 requires-python = ">=3.8"
-license = { text = "MIT" }
+license = "MIT"
 dependencies = [
     "rich>=13.0",
 ]

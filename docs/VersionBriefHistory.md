@@ -12,6 +12,25 @@ ERROR 编号体系自 v1.3.1 起引入。
 
 ## v1.10.2（2026-10-16）
 
+网页版商店（阶段四：模组集）
+
+### 新增
+
+- **模组集列表页**（`web/collections/index.html`）
+- **模组集详情页**（`web/collections/detail.html`）：显示模组集包含的所有模组，支持复制一键安装命令
+- **模组集数据**（`mods/collections.json`）：含"新手推荐包"和"被动觉醒精选"
+- **首页模组集分区**：显示前 3 个模组集
+- **部署 workflow**：复制 `collections.json` 到 `web/collections/`
+
+### 修复
+
+- `collections/index.html` 补齐 `render.js` 引用（`escapeHtml` 未定义）
+- 本地开发服务器改用禁缓存策略
+
+---
+
+## v1.10.2（2026-10-16）
+
 网页版商店（阶段三：详情页）
 
 - （待补充）

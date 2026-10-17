@@ -1,34 +1,25 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 """版本号一键升级工具。
 
 用法：
-    python tools/bump.py 1.7.0
-    python tools/bump.py v1.7.0 --date 2026-10-08
-    python tools/bump.py 1.7.0 --dry-run          # 只看不改
-    python tools/bump.py 1.7.0 --new-entry "阶段四：下载与安装"
+    setver 1.13.0                            # 只升级版本号
+    setver 1.13.0 "标题"                      # 升级 + 插入版本历史条目
+    setver 1.13.0 "标题" "详情（\\n 换行）"    # 带详情
+    setver 1.13.0 "标题" "详情" --git          # 完成后询问是否 git 提交
+    setver 1.13.0 --dry-run                  # 预览，不写入
 
 作用：
-    自动同步以下文件的版本号：
-    - pyproject.toml        → version = "X.Y.Z"
-    - src/uno/main.py       → VERSION = "vX.Y.Z"
+    自动同步：
+    - pyproject.toml
+    - src/uno/main.py
     - docs/DEVELOPER_GUIDE.md
-        · **版本：vX.Y.Z**
-        · 当前稳定版本：**vX.Y.Z**
     - docs/VersionBriefHistory.md
-        · 从 v0.1.0 到 vX.Y.Z 期间
-        · **当前版本：vX.Y.Z**（日期）
-
-    可选 --new-entry 时，会在 VersionBriefHistory.md 顶部
-    插入一条新版本条目骨架（标题 + 日期 + 空内容）。
-
-不动的部分：
-    - 所有历史条目（## v1.5.0（...）等）
-    - 版本历史正文
-    - git（不自动 commit / push）
+    如果给了标题，会在版本历史顶部插入新条目。
 """
 import argparse
 import datetime
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -36,7 +27,6 @@ ROOT = Path(__file__).resolve().parent.parent
 
 
 def normalize(ver: str) -> str:
-    """去掉前缀 v，规范为 X.Y.Z。"""
     ver = ver.strip()
     if ver.startswith('v'):
         ver = ver[1:]
@@ -45,69 +35,93 @@ def normalize(ver: str) -> str:
     return ver
 
 
-def replace_pattern(path: Path, pattern: str, repl: str, desc: str,
-                    dry_run: bool = False) -> bool:
-    """替换文件里的版本号。返回是否成功。"""
+def replace_pattern(path, pattern, repl, desc, dry_run=False):
     if not path.exists():
         print(f"  [跳过] {path} 不存在")
         return False
-
     text = path.read_text(encoding='utf-8')
     new_text, count = re.subn(pattern, repl, text, flags=re.MULTILINE)
-
     if count == 0:
         print(f"  [未匹配] {path} — {desc}")
         return False
-
     if new_text == text:
-        print(f"  [无变化] {path} — {desc}（可能已是目标版本）")
+        print(f"  [无变化] {path} — {desc}")
         return True
-
     if not dry_run:
         path.write_text(new_text, encoding='utf-8')
-
     tag = "预览" if dry_run else "已改"
     print(f"  [{tag}] {path} — {desc}（{count} 处）")
     return True
 
 
-def insert_new_entry(path: Path, ver: str, date: str, title: str,
-                     dry_run: bool = False):
-    """在 VersionBriefHistory.md 的 `---` 分隔线后插入新条目。"""
+def insert_new_entry(path, ver, date, subject, details, dry_run=False):
+    """在版本历史顶部插入新条目。"""
     if not path.exists():
         print(f"  [跳过] {path} 不存在")
         return
-
     text = path.read_text(encoding='utf-8')
-    entry = f"## v{ver}（{date}）\n\n{title}\n\n- （待补充）\n\n---\n"
 
-    # 找第一个 "---" 分隔线（顶部元信息之后）
-    marker = "\n---\n"
-    idx = text.find(marker)
-    if idx == -1:
-        print(f"  [未匹配] {path} — 找不到分隔线 ---")
+    body = subject
+    if details:
+        details_text = details.replace('\\n', '\n')
+        body += f"\n\n{details_text}"
+
+    entry = f"## v{ver}（{date}）\n\n{body}\n\n---\n\n"
+
+    m = re.search(r'^## v[\d.]+', text, re.MULTILINE)
+    if not m:
+        print(f"  [跳过] {path} — 找不到 ## vX.Y.Z 条目")
         return
-
-    insert_at = idx + len(marker)
-    new_text = text[:insert_at] + "\n" + entry + text[insert_at:]
+    idx = m.start()
+    new_text = text[:idx] + entry + text[idx:]
 
     if not dry_run:
         path.write_text(new_text, encoding='utf-8')
-
     tag = "预览" if dry_run else "已改"
-    print(f"  [{tag}] {path} — 插入 v{ver} 条目骨架")
-    print(f"      标题：{title}")
+    print(f"  [{tag}] {path} — 插入 v{ver} 条目")
+
+
+def ask_and_run_git(commit_msg):
+    print()
+    answer = input("是否立即 git 提交并推送？(y/N) ").strip().lower()
+    if answer != 'y':
+        print("已跳过 git 操作")
+        return
+    try:
+        print("→ git add -A")
+        subprocess.run(["git", "add", "-A"], check=True, cwd=ROOT)
+        print(f"→ git commit -m {commit_msg!r}")
+        subprocess.run(["git", "commit", "-m", commit_msg], check=True, cwd=ROOT)
+        print("→ git push")
+        subprocess.run(["git", "push"], check=True, cwd=ROOT)
+        print("✅ 已提交并推送")
+    except subprocess.CalledProcessError as e:
+        print(f"❌ git 操作失败：{e}")
+    except Exception as e:
+        print(f"❌ 意外错误：{e}")
 
 
 def main():
-    parser = argparse.ArgumentParser(description="版本号一键升级")
-    parser.add_argument("version", help="新版本号，如 1.7.0 或 v1.7.0")
+    parser = argparse.ArgumentParser(
+        description="版本号一键升级",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""示例：
+  setver 1.13.0
+  setver 1.13.0 "新增 X 功能"
+  setver 1.13.0 "新增 X 功能" "- 加了 A\\n- 修了 B" --git
+""",
+    )
+    parser.add_argument("version", help="新版本号，如 1.13.0 或 v1.13.0")
+    parser.add_argument("subject", nargs="?", default=None,
+                        help="版本历史标题（可选）")
+    parser.add_argument("details", nargs="?", default=None,
+                        help="版本历史详情，用 \\n 表示换行（可选）")
     parser.add_argument("--date", default=None,
                         help="日期（YYYY-MM-DD），默认今天")
     parser.add_argument("--dry-run", action="store_true",
                         help="只显示改动，不写入文件")
-    parser.add_argument("--new-entry", default=None,
-                        help="在 VersionBriefHistory.md 顶部插入新条目标题")
+    parser.add_argument("--git", action="store_true",
+                        help="完成后询问是否 git 提交并推送")
     args = parser.parse_args()
 
     try:
@@ -123,10 +137,7 @@ def main():
         print("模式：预览（不写入）")
     print()
 
-    ok_count = 0
-
-    # 1. pyproject.toml
-    ok_count += replace_pattern(
+    replace_pattern(
         ROOT / "pyproject.toml",
         r'^version\s*=\s*"[^"]+"',
         f'version = "{ver}"',
@@ -134,8 +145,7 @@ def main():
         args.dry_run,
     )
 
-    # 2. src/uno/main.py
-    ok_count += replace_pattern(
+    replace_pattern(
         ROOT / "src/uno/main.py",
         r'^VERSION\s*=\s*"[^"]+"',
         f'VERSION = "v{ver}"',
@@ -143,71 +153,38 @@ def main():
         args.dry_run,
     )
 
-    # 3. docs/DEVELOPER_GUIDE.md
     guide = ROOT / "docs/DEVELOPER_GUIDE.md"
-    ok_count += replace_pattern(
-        guide,
-        r'\*\*版本：v[\d.]+',
-        f'**版本：v{ver}',
-        "版本标识",
-        args.dry_run,
-    )
-    ok_count += replace_pattern(
-        guide,
-        r'当前稳定版本：\*\*v[\d.]+',
-        f'当前稳定版本：**v{ver}',
-        "当前稳定版本",
-        args.dry_run,
-    )
+    replace_pattern(guide, r'\*\*版本：v[\d.]+',
+                    f'**版本：v{ver}', "版本标识", args.dry_run)
+    replace_pattern(guide, r'当前稳定版本：\*\*v[\d.]+',
+                    f'当前稳定版本：**v{ver}', "当前稳定版本", args.dry_run)
+    replace_pattern(guide, r'\*\*最后更新：[\d-]+\*\*',
+                    f'**最后更新：{date}**', "头部最后更新", args.dry_run)
 
-    # 4. docs/VersionBriefHistory.md
     history = ROOT / "docs/VersionBriefHistory.md"
-    ok_count += replace_pattern(
-        history,
-        r'到 v[\d.]+ 期间',
-        f'到 v{ver} 期间',
-        "顶部版本范围",
-        args.dry_run,
-    )
-    ok_count += replace_pattern(
-        history,
-        r'\*\*当前版本：v[\d.]+\*\*（[^）]+）',
-        f'**当前版本：v{ver}**（{date}）',
-        "当前版本标注",
-        args.dry_run,
-    )
+    replace_pattern(history, r'到 v[\d.]+ 期间',
+                    f'到 v{ver} 期间', "顶部版本范围", args.dry_run)
+    replace_pattern(history, r'\*\*当前版本：v[\d.]+\*\*（[^）]+）',
+                    f'**当前版本：v{ver}**（{date}）', "当前版本标注", args.dry_run)
+    replace_pattern(history, r'最后更新：[\d-]+ · v[\d.]+',
+                    f'最后更新：{date} · v{ver}', "尾部最后更新", args.dry_run)
 
-    # 5. 尾部"最后更新"（带版本号）
-    ok_count += replace_pattern(
-        history,
-        r'最后更新：[\d-]+ · v[\d.]+',
-        f'最后更新：{date} · v{ver}',
-        "尾部最后更新",
-        args.dry_run,
-    )
-
-    # 6. DEVELOPER_GUIDE 头部的"最后更新"（只有日期）
-    ok_count += replace_pattern(
-        guide,
-        r'\*\*最后更新：[\d-]+\*\*',
-        f'**最后更新：{date}**',
-        "头部最后更新",
-        args.dry_run,
-    )
-
-    # 7. 可选：插入新条目
-    if args.new_entry:
+    if args.subject:
         print()
-        insert_new_entry(history, ver, date, args.new_entry, args.dry_run)
+        insert_new_entry(history, ver, date, args.subject, args.details, args.dry_run)
 
     print()
-    print(f"完成，共 {ok_count} 处文件处理。")
+    print("完成。")
 
     if args.dry_run:
         print("（预览模式，未写入任何文件）")
+        return
+
+    if args.git:
+        commit_msg = args.subject or f"chore: 版本号升级到 v{ver}"
+        ask_and_run_git(commit_msg)
     else:
-        print("\n下一步建议：")
-        print(f"  git add -A && git commit -m 'chore: 版本号升级到 v{ver}'")
+        print(f"\n下一步：git add -A && git commit -m '...' && git push")
 
 
 if __name__ == "__main__":

@@ -1,8 +1,12 @@
-"""测试 tools/discover_mods.py。全部 mock，不联网。"""
+"""测试 tools/discover_mods.py。全部 mock，不联网。
+
+mock 层：patch dm._http_get，返回 (status_code, body_bytes)。
+"""
 import os
 import sys
 import json
-from unittest.mock import patch, MagicMock
+import urllib.parse
+from unittest.mock import patch
 
 import pytest
 
@@ -13,43 +17,37 @@ sys.path.insert(0, os.path.join(PROJECT_ROOT, "tools"))
 import discover_mods as dm
 
 
-def _make_response(status=200, json_data=None, text=None):
-    m = MagicMock()
-    m.status_code = status
+def _make_http(status=200, json_data=None):
+    """构造 _http_get 的返回值 (status_code, body_bytes)。"""
     if json_data is not None:
-        m.json.return_value = json_data
-    else:
-        m.json.side_effect = ValueError("not json")
-    return m
+        return (status, json.dumps(json_data, ensure_ascii=False).encode("utf-8"))
+    return (status, b"")
 
 
-def _mock_repo(owner, name, branch="main"):
-    return {"owner": {"login": owner}, "name": name, "default_branch": branch}
-
-
-def _mock_search(owners, per_page=100):
-    """构造 search_repositories 的响应。owners 是 [(owner, repo_name)]"""
-    items = [_mock_repo(o, r) for o, r in owners]
-    return _make_response(200, {"items": items})
+def _mock_search(owners):
+    """owners: [(owner, repo_name)]"""
+    items = [
+        {"owner": {"login": o}, "name": r, "default_branch": "main"}
+        for o, r in owners
+    ]
+    return _make_http(200, {"items": items})
 
 
 def _full_meta(mid, owner="author"):
     return {
         "ID": mid, "name": f"模组{mid}", "description": "d",
-        "author": owner, "author_github": owner, "repo": f"https://github.com/{owner}/{mid}",
+        "author": owner, "author_github": owner,
+        "repo": f"https://github.com/{owner}/{mid}",
         "version": "1.0.0", "micover": "1.0.0", "lacover": None,
         "skills": 1,
     }
 
 
 def _setup_mods_dir(tmp_path, monkeypatch):
-    """把 mods_dir 固定到 tmp_path，并造一个干净的 mod_idx.json。"""
-    monkeypatch.setattr(dm, "os", dm.os)  # no-op
-
+    """把 mods_dir 固定到 tmp_path，造干净环境。"""
     fake_root = tmp_path
     (fake_root / "mods").mkdir(exist_ok=True)
 
-    # 造 official.json 和 handpicked 元数据
     (fake_root / "mods" / "official.json").write_text(
         json.dumps({"version": "1.0.0", "mods": ["S1.json"]}), encoding="utf-8")
     (fake_root / "mods" / "S1.json").write_text(
@@ -63,7 +61,6 @@ def _setup_mods_dir(tmp_path, monkeypatch):
         "update_time": "",
     }), encoding="utf-8")
 
-    # patch 根目录
     fake_script = fake_root / "tools" / "discover_mods.py"
     fake_script.parent.mkdir(exist_ok=True)
     fake_script.touch()
@@ -75,10 +72,7 @@ def _setup_mods_dir(tmp_path, monkeypatch):
 
 
 def _run_with_repos(tmp_path, monkeypatch, repos, meta_map, old_other=None):
-    """在 tmp_path 环境里跑 main()。
-    repos: [(owner, repo_name)]
-    meta_map: {(owner, repo_name): meta_dict or None}
-    """
+    """repos: [(owner, repo_name)]；meta_map: {(owner, repo): meta或None}"""
     root = _setup_mods_dir(tmp_path, monkeypatch)
 
     if old_other is not None:
@@ -89,18 +83,17 @@ def _run_with_repos(tmp_path, monkeypatch, repos, meta_map, old_other=None):
 
     search_resp = _mock_search(repos)
 
-    def fake_get(url, **kwargs):
+    def fake_http(url, headers, timeout):
         if "search/repositories" in url:
             return search_resp
-        # raw
         for (o, r), meta in meta_map.items():
             if f"/{o}/{r}/" in url:
                 if meta is None:
-                    return _make_response(404)
-                return _make_response(200, meta)
-        return _make_response(404)
+                    return (404, b"")
+                return _make_http(200, meta)
+        return (404, b"")
 
-    with patch.object(dm.requests, "get", side_effect=fake_get):
+    with patch.object(dm, "_http_get", side_effect=fake_http):
         dm.main()
 
     return root
@@ -154,7 +147,7 @@ class TestDiscovery:
 
     def test_author_case_insensitive(self, tmp_path, monkeypatch):
         repos = [("Alice", "mod")]
-        meta = _full_meta("M", "alice")  # 小写
+        meta = _full_meta("M", "alice")
         meta_map = {("Alice", "mod"): meta}
         root = _run_with_repos(tmp_path, monkeypatch, repos, meta_map)
         idx = json.loads((root / "mods" / "mod_idx.json").read_text(encoding="utf-8"))
@@ -168,9 +161,6 @@ class TestDiscovery:
         assert "EXAMPLE.json" not in idx["other"]
 
     def test_removed_when_gone(self, tmp_path, monkeypatch):
-        # old_other 有 OLD，但本次没发现
-        (tmp_path / "mods").mkdir(exist_ok=True)
-        # 先造文件
         root = _setup_mods_dir(tmp_path, monkeypatch)
         (root / "mods" / "OLD.json").write_text(
             json.dumps(_full_meta("OLD"), ensure_ascii=False), encoding="utf-8")
@@ -179,7 +169,7 @@ class TestDiscovery:
         data["other"] = ["OLD.json"]
         idx_path.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
 
-        with patch.object(dm.requests, "get", side_effect=lambda *a, **k: _mock_search([])):
+        with patch.object(dm, "_http_get", side_effect=lambda *a, **k: _mock_search([])):
             dm.main()
 
         idx = json.loads((root / "mods" / "mod_idx.json").read_text(encoding="utf-8"))
@@ -197,22 +187,22 @@ class TestDiscovery:
         assert "DUP.json" in idx["other"]
 
     def test_pagination(self, tmp_path, monkeypatch):
-        # 150 个仓库 → 2 次请求
         owners = [(f"o{i}", f"r{i}") for i in range(150)]
         pages = [owners[:100], owners[100:]]
-
         call_count = {"n": 0}
 
-        def fake_get(url, **kwargs):
+        def fake_http(url, headers, timeout):
             if "search/repositories" in url:
                 call_count["n"] += 1
-                page = kwargs.get("params", {}).get("page", 1)
+                qs = urllib.parse.urlparse(url).query
+                params = urllib.parse.parse_qs(qs)
+                page = int(params.get("page", ["1"])[0])
                 batch = pages[page - 1] if page - 1 < len(pages) else []
                 return _mock_search(batch)
-            return _make_response(404)
+            return (404, b"")
 
         _setup_mods_dir(tmp_path, monkeypatch)
-        with patch.object(dm.requests, "get", side_effect=fake_get):
+        with patch.object(dm, "_http_get", side_effect=fake_http):
             dm.main()
 
         assert call_count["n"] == 2
@@ -226,7 +216,7 @@ class TestDiscovery:
         data["other"] = ["OLD.json"]
         idx_path.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
 
-        with patch.object(dm.requests, "get", side_effect=lambda *a, **k: _mock_search([])):
+        with patch.object(dm, "_http_get", side_effect=lambda *a, **k: _mock_search([])):
             dm.main()
 
         out = capsys.readouterr().out

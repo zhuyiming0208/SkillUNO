@@ -21,9 +21,6 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Install dependencies
-        run: pip install requests
-
       - name: Run discovery
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

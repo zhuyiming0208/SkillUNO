@@ -5,12 +5,16 @@
 - other 每次完全重建
 - 失效仓库自动移除（不删官方、不删 handpicked）
 - 结果写入 mods/，由 CI 通过 PR 提交供人工审核
+
+依赖：仅标准库（urllib.request），不依赖 requests。
 """
 import os
 import sys
 import json
 import time
-import requests
+import urllib.request
+import urllib.error
+import urllib.parse
 
 
 GITHUB_API = "https://api.github.com"
@@ -32,29 +36,48 @@ def _headers():
     return h
 
 
+def _http_get(url, headers, timeout):
+    """发起 GET。返回 (status_code, body_bytes)。
+
+    HTTP 错误码（404/403/429 等）不抛异常，返回对应 code + 空 body。
+    网络层错误（DNS/超时/连接失败）抛 urllib.error.URLError。
+    """
+    req = urllib.request.Request(url, headers=headers)
+    try:
+        resp = urllib.request.urlopen(req, timeout=timeout)
+        status = resp.getcode() or getattr(resp, "status", 200)
+        body = resp.read()
+        resp.close()
+        return status, body
+    except urllib.error.HTTPError as e:
+        return e.code, b""
+
+
 def search_repos():
     """搜索所有带 topic:skilluno-mod 的仓库。返回 [{owner, name, default_branch}]。"""
     repos = []
     page = 1
     while True:
-        url = f"{GITHUB_API}/search/repositories"
-        params = {"q": f"topic:{TOPIC}", "per_page": 100, "page": page}
+        qs = urllib.parse.urlencode(
+            {"q": f"topic:{TOPIC}", "per_page": 100, "page": page}
+        )
+        url = f"{GITHUB_API}/search/repositories?{qs}"
         try:
-            r = requests.get(url, headers=_headers(), params=params, timeout=30)
-        except requests.RequestException as e:
+            status, body = _http_get(url, _headers(), 30)
+        except urllib.error.URLError as e:
             print(f"警告：搜索请求失败：{e}")
             break
 
-        if r.status_code in (403, 429):
-            print(f"警告：GitHub API 速率限制 ({r.status_code})，停止搜索")
+        if status in (403, 429):
+            print(f"警告：GitHub API 速率限制 ({status})，停止搜索")
             break
-        if r.status_code != 200:
-            print(f"警告：搜索返回 HTTP {r.status_code}，停止搜索")
+        if status != 200:
+            print(f"警告：搜索返回 HTTP {status}，停止搜索")
             break
 
         try:
-            data = r.json()
-        except ValueError:
+            data = json.loads(body.decode("utf-8"))
+        except (ValueError, UnicodeDecodeError):
             print("警告：搜索响应不是合法 JSON，停止搜索")
             break
 
@@ -75,14 +98,14 @@ def fetch_metadata(owner, repo, branch):
     """从 raw.githubusercontent.com 拉 skilluno_mod.json。失败返回 None。"""
     url = f"{RAW_BASE}/{owner}/{repo}/{branch}/skilluno_mod.json"
     try:
-        r = requests.get(url, headers={"User-Agent": USER_AGENT}, timeout=15)
-    except requests.RequestException:
+        status, body = _http_get(url, {"User-Agent": USER_AGENT}, 15)
+    except urllib.error.URLError:
         return None
-    if r.status_code != 200:
+    if status != 200:
         return None
     try:
-        return r.json()
-    except ValueError:
+        return json.loads(body.decode("utf-8"))
+    except (ValueError, UnicodeDecodeError):
         return None
 
 

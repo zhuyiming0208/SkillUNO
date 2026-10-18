@@ -623,3 +623,40 @@ ACHIEVEMENTS = []
 ---
 
 现在，发挥你的想象力，为 SkillUNO 增添新乐趣吧！
+
+---
+
+## 自动发现机制
+
+SkillUNO 网页商店和 CLI 商店都支持**自动发现**社区模组，无需手动提 PR。
+
+### 加入自动发现的条件
+
+1. 仓库添加 GitHub topic：`skilluno-mod`
+2. 仓库根目录放 `skilluno_mod.json`（字段见本文档开头的「模组元数据 JSON 格式」）
+3. `skilluno_mod.json` 里的 `author_github` 必须与仓库 owner 一致
+
+### 扫描机制
+
+- 每天 UTC 00:00 自动扫描所有带 `skilluno-mod` topic 的仓库
+- 结果以 PR 形式提交到本仓库的 `mods/` 目录
+- 维护者人工审核后合并
+- 新赛季只需改 `official.json`；第三方模组由这个自动流程维护 `mod_idx.json` 的 `other` 列表
+
+### 退出自动发现
+
+- 删除 `skilluno-mod` topic
+- 或删除 `skilluno_mod.json`
+- 或删除仓库
+
+下次扫描时会从 `other` 列表移除，并删除对应的 `mods/{ID}.json`。
+
+### 想上首页？
+
+首页「精选模组」区（`handpicked`）需要**人工精选**，不由自动流程维护。
+想让你的模组上首页，请提 PR 修改 `mods/mod_idx.json` 的 `handpicked` 列表，或联系维护者。
+
+### 审核重点
+
+每次自动 PR 会列出「新增 / 更新 / 移除」三类变更。维护者会重点检查**移除列表**，确认没有误删。若你的仓库被误删，可在 PR 里评论说明。
+

@@ -4,9 +4,21 @@
 ERROR 编号体系自 v1.3.1 起引入。
 完整的 API 说明请参阅 docs/DEVELOPER_GUIDE.md。
 
-本文档按版本顺序（由新到旧）记录从 v0.1.0 到 v1.13.0 期间的所有修复内容。每个版本列出该版本修复的 bug、调整的功能及对应的错误编号。
+本文档按版本顺序（由新到旧）记录从 v0.1.0 到 v1.14.0 期间的所有修复内容。每个版本列出该版本修复的 bug、调整的功能及对应的错误编号。
 
-> **当前版本：v1.13.0**（2026-10-17）
+> **当前版本：v1.14.0**（2026-10-18）
+
+---
+
+## v1.14.0（2026-10-18）
+
+自动发现社区模组
+
+- 新增 tools/discover_mods.py：每日扫描 skilluno-mod topic 并重建 other 列表
+- 新增 .github/workflows/discover-mods.yml：结果以 PR 提交人工审核
+- other 完全重建，失效仓库自动移除（不删官方、不删 handpicked）
+- 新增 tests/test_discover_mods.py（12 个 mock 测试）
+- 更新 mods/HOW_TO_MAKE_A_MOD.md 自动发现章节
 
 ---
 
@@ -1026,4 +1038,4 @@ python -m unittest tests.test_mod_index
 
 ---
 
-最后更新：2026-10-17 · v1.13.0
+最后更新：2026-10-18 · v1.14.0

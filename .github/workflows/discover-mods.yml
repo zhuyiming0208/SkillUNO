@@ -1,0 +1,45 @@
+name: Discover Mods
+
+on:
+  schedule:
+    - cron: '0 0 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  discover:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install requests
+
+      - name: Run discovery
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python tools/discover_mods.py
+
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "chore: auto-discover mods $(date -u +%Y-%m-%d)"
+          title: "Auto-discovered mods $(date -u +%Y-%m-%d)"
+          body: |
+            自动发现的新模组，请审核后合并。
+
+            **请重点检查"移除"列表**，确认没有误删。
+          branch: auto-discover-mods
+          delete-branch: true
+          add-paths: |
+            mods/

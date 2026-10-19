@@ -3274,3 +3274,97 @@ class TestStatsPanel:
         out = capsys.readouterr().out
         assert '玩家排行榜' in out
         assert '你' in out
+
+# ===== v1.15.0 HYBRID 混合技能测试 =====
+
+from types import SimpleNamespace
+
+
+class _FakeUI_HYBRID:
+    def __init__(self):
+        self.messages = []
+    def show(self, msg):
+        self.messages.append(msg)
+    def input(self, prompt=""):
+        return ""
+
+
+class _FakeGame_HYBRID:
+    def __init__(self):
+        self.players = []
+        self.debug = False
+        self.ui = _FakeUI_HYBRID()
+        self.events = []
+    def record_event(self, t, **kw):
+        self.events.append({"type": t, **kw})
+
+
+def _make_player_hybrid(name, is_human=False):
+    p = SimpleNamespace()
+    p.name = name
+    p.is_human = is_human
+    p.eliminated = False
+    p.skills = []
+    p.ui = _FakeUI_HYBRID()
+    p.hand = []
+    p.hand_limit = 15
+    return p
+
+
+class _HybridProbe(Skill):
+    """同时响应 TURN_START（主动）与 CARDS_ADDED（被动）的探针技能。"""
+    def __init__(self, owner, game):
+        super().__init__('混合探针', SkillType.HYBRID, 'desc', owner=owner, game=game)
+        self.manual_calls = 0
+        self.passive_calls = 0
+
+    def can_trigger(self, event, context):
+        if self.is_consumed or self.is_deleted:
+            return False
+        if event == GameEvent.TURN_START and context.get('player') == self.owner:
+            return True
+        if event == GameEvent.CARDS_ADDED:
+            return True
+        return False
+
+    def activate(self, event, context):
+        if event == GameEvent.TURN_START and context.get('player') == self.owner:
+            self.manual_calls += 1
+            self.is_consumed = True
+            return True
+        self.passive_calls += 1
+        return True
+
+
+class TestHybridSkill:
+    def _setup(self):
+        game = _FakeGame_HYBRID()
+        owner = _make_player_hybrid("A")
+        skill = _HybridProbe(owner, game)
+        owner.skills.append(skill)
+        game.players.append(owner)
+        sm = SkillManager(game)
+        return game, owner, skill, sm
+
+    def test_hybrid_skill_can_trigger_passively(self):
+        game, owner, skill, sm = self._setup()
+        sm.trigger(GameEvent.CARDS_ADDED,
+                   {'target': owner, 'amount': 2,
+                    'add_multiplier': 1.0, 'cards_info': []})
+        assert skill.passive_calls == 1
+        assert skill.manual_calls == 0
+
+    def test_hybrid_skill_can_be_activated_manually(self):
+        game, owner, skill, sm = self._setup()
+        sm.execute_skill(skill, GameEvent.TURN_START, {'player': owner})
+        assert skill.manual_calls == 1
+        assert skill.is_consumed is True
+
+    def test_hybrid_skill_passive_does_not_consume(self):
+        game, owner, skill, sm = self._setup()
+        sm.trigger(GameEvent.CARDS_ADDED,
+                   {'target': owner, 'amount': 1,
+                    'add_multiplier': 1.0, 'cards_info': []})
+        assert skill.passive_calls == 1
+        assert skill.is_consumed is False
+

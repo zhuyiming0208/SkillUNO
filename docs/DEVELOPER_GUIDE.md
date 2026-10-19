@@ -1,7 +1,7 @@
 # SkillUNO 开发者文档
 
-**版本：v1.14.0**
-**最后更新：2026-10-18**
+**版本：v1.15.0**
+**最后更新：2026-10-19**
 
 本文档面向希望为 SkillUNO 编写 Mod、自定义 UI 或扩展游戏核心的开发者。如果你是玩家，请先阅读 `docs/FAQ.md`。  
 如需查看历史修复记录，请参阅 `docs/VersionBriefHistory.md`。
@@ -12,7 +12,7 @@
 
 SkillUNO 是一个基于 Python 的 UNO 卡牌游戏框架，核心设计理念是 **事件驱动 + Mod 化**。所有技能、赛季、甚至 UI 都可以通过简单的 Python 类进行扩展，无需修改核心引擎。
 
-当前稳定版本：**v1.14.0**
+当前稳定版本：**v1.15.0**
 
 ---
 
@@ -98,7 +98,7 @@ class MySkill(Skill):
     def __init__(self, owner, game):
         super().__init__(
             name='技能名',
-            skill_type=SkillType.ACTIVE,   # ACTIVE / PASSIVE / DEATH
+            skill_type=SkillType.ACTIVE,   # ACTIVE / PASSIVE / DEATH / HYBRID
             description='简短描述',
             help_text='详细说明',
             owner=owner,
@@ -123,6 +123,50 @@ class MySkill(Skill):
 ACTIVE 主动技能，玩家手动发动
 PASSIVE 被动技能，满足条件自动触发
 DEATH 亡语技能，玩家被淘汰时触发
+HYBRID 混合技能，主动与被动兼有
+
+### 3.2.1 混合技能（HYBRID）
+
+`SkillType.HYBRID` 允许同一个技能既能在玩家回合内主动发动，又能监听后台事件被动触发。引擎会：
+
+- 在 `trigger()` 中像 `PASSIVE`/`DEATH` 一样把 HYBRID 技能一并派发；
+- 在回合内玩家/AI 选择主动技能时，把 HYBRID 与 `ACTIVE` 同等对待。
+
+同一个 `activate(event, context)` 通过 `event` 区分触发来源：
+
+```python
+from uno.core import Skill, SkillType, GameEvent
+
+
+class MyHybrid(Skill):
+    def __init__(self, owner, game):
+        super().__init__('混合技能', SkillType.HYBRID, 'desc',
+                         owner=owner, game=game)
+
+    def can_trigger(self, event, context):
+        if self.is_consumed or self.is_deleted:
+            return False
+        if event == GameEvent.TURN_START and context.get('player') == self.owner:
+            return True
+        if event == GameEvent.SKILL_ACTIVATED:
+            activated = context.get('activated_skill')
+            return bool(activated and activated.owner != self.owner)
+        return False
+
+    def activate(self, event, context):
+        if event == GameEvent.TURN_START and context.get('player') == self.owner:
+            self.owner_print('主动发动！')
+            self.is_consumed = True
+            return True
+        self.owner_print('被动触发！')
+        return True
+```
+
+要点：
+
+· 主动释放时引擎传入 GameEvent.TURN_START 且 context['player'] is self.owner；
+· 被动分支默认不设置 is_consumed，玩家之后仍可主动使用；
+· 在 SKILL_ACTIVATED 分支务必判断 activated.owner != self.owner，否则自身技能会递归触发。
 
 3.3 AI 紧迫度系统
 
@@ -212,6 +256,7 @@ def evaluate_urgency(self, game):
 
 · PASSIVE：由事件自动触发，不进入主动技能列表。
 · DEATH：亡语，由 PLAYER_DIED 触发。
+· HYBRID：混合技能，既响应 TURN_START 主动发动，也响应被动事件。
 · 拦截型 ACTIVE（如 离析、祸水）：虽然类型是 ACTIVE，但它们的 can_trigger 只响应 BEING_ADDED_CARDS，不响应 TURN_START，因此不会被 AI 评估。
 
 3.3.6 官方赛季的紧迫度参考

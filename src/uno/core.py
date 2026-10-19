@@ -11,6 +11,7 @@ class SkillType(Enum):
     ACTIVE = auto()
     PASSIVE = auto()
     DEATH = auto()
+    HYBRID = auto()
 
 
 class GameEvent(Enum):
@@ -125,6 +126,19 @@ class Deck:
 
 
 class Skill:
+    """技能基类。
+
+    SkillType 说明：
+      - ACTIVE：仅主动，玩家在回合内选择发动（引擎传 GameEvent.TURN_START）。
+      - PASSIVE：仅被动，引擎在事件派发时自动执行。
+      - DEATH：亡语，玩家死亡/淘汰时自动执行。
+      - HYBRID：主动 + 被动混合。同一个 activate() 处理两类触发：
+          * 主动释放：event == GameEvent.TURN_START 且 context.get('player') is self.owner
+          * 被动监听：其他事件（SKILL_ACTIVATED / BEING_ADDED_CARDS / CARDS_ADDED 等）
+        约定：主动分支执行完毕置 self.is_consumed = True；
+        被动分支若希望玩家之后仍能主动使用，则不要消耗（is_consumed 保持 False）。
+    """
+
     def __init__(self, name: str, skill_type: SkillType, description: str,
                  help_text: str = "", owner: 'Player' = None, game: 'UNOGame' = None,
                  combo_partners: tuple = None, combo_effect: type = None,
@@ -289,7 +303,7 @@ class Player:
                 continue
             if choice.lower() == 's':
                 usable = [s for s in self.skills if not s.is_consumed and not s.is_deleted
-                          and s.type == SkillType.ACTIVE
+                          and s.type in (SkillType.ACTIVE, SkillType.HYBRID)
                           and s.can_trigger(GameEvent.TURN_START, {'player': self})]
                 combos = self.get_available_combos()
                 if not usable and not combos:
@@ -336,7 +350,7 @@ class Player:
 
     def ai_choose(self, top_card: Card, current_color: str) -> Optional[int]:
         usable = [s for s in self.skills if not s.is_consumed and not s.is_deleted
-                  and s.type == SkillType.ACTIVE
+                  and s.type in (SkillType.ACTIVE, SkillType.HYBRID)
                   and s.can_trigger(GameEvent.TURN_START, {'player': self})]
         if usable:
             best_skill = max(usable, key=lambda s: s.evaluate_urgency(self.game))
@@ -404,7 +418,7 @@ class SkillManager:
                     if event == GameEvent.GAME_START:
                         skill.activate(event, context)
                         self.game.record_event('skill_use', player=skill.owner.name, skill_name=skill.name)
-                    elif skill.type in (SkillType.PASSIVE, SkillType.DEATH) or event in (GameEvent.START_RANDOM, GameEvent.END_RANDOM):
+                    elif skill.type in (SkillType.PASSIVE, SkillType.DEATH, SkillType.HYBRID) or event in (GameEvent.START_RANDOM, GameEvent.END_RANDOM):
                         self.execute_skill(skill, event, context)
 
     def execute_skill(self, skill: Skill, event: GameEvent, context: Dict[str, Any]):
@@ -450,7 +464,7 @@ class SkillManager:
 
     def ask_human_intercept(self, player: Player, event: GameEvent, context: Dict[str, Any]) -> bool:
         intercept = [s for s in player.skills if not s.is_consumed and not s.is_deleted
-                     and s.type == SkillType.ACTIVE and s.can_trigger(event, context)]
+                     and s.type in (SkillType.ACTIVE, SkillType.HYBRID) and s.can_trigger(event, context)]
         if not intercept:
             return False
         player.ui.show(f"{player.name}，你受到加牌，可以使用以下技能：")

@@ -1,0 +1,29 @@
+{
+  "ID": "LOD",
+  "name": "生死赛季",
+  "description": "包含偷看、自爆、逃逸与假死。游走在生与死的边缘，体验极端的生存博弈。",
+  "author": "zhuyiming0208",
+  "author_github": "zhuyiming0208",
+  "repo": "https://github.com/zhuyiming0208/SkillUNO-Mod-LOD",
+  "license": "MIT",
+  "version": "1.0.0",
+  "micover": "1.0.0",
+  "lacover": null,
+  "skills": 6,
+  "achievements": 1,
+  "needs": [
+    "core.Skill",
+    "core.SkillType",
+    "core.GameEvent"
+  ],
+  "rely_on": {},
+  "reject": {},
+  "only_tolerate": [],
+  "tags": [
+    "生死",
+    "硬核",
+    "整活"
+  ],
+  "created_at": "2026-10-19",
+  "updated_at": "2026-10-19"
+}

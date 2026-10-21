@@ -1,6 +1,10 @@
 {
-  "handpicked": ["example.json"],
-  "other": [],
   "version": "1.0.0",
-  "update_time": "2026-10-07"
+  "handpicked": [
+    "example.json"
+  ],
+  "other": [
+    "LOD.json"
+  ],
+  "update_time": "2026-10-21"
 }

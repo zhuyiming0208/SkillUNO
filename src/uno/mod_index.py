@@ -113,6 +113,16 @@ class ModIndex:
                 result.append(mod)
         return result
 
+    def get_other(self) -> List[Dict]:
+        """获取第三方模组列表（other，不含 handpicked）。"""
+        index = self.load_index()
+        result = []
+        for filename in index.get("other", []):
+            mod = self.load_mod(filename)
+            if mod is not None:
+                result.append(mod)
+        return result
+
     def get_all(self) -> List[Dict]:
         """获取全部模组列表（handpicked + other）。"""
         index = self.load_index()

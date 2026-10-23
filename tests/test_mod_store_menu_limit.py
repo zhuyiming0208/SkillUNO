@@ -22,7 +22,7 @@ def _make_mod(i):
 
 
 class FakeIndex:
-    def __init__(self, handpicked=None, official=None):
+    def __init__(self, handpicked=None, official=None, other=None):
         if official is None:
             official = [
                 {"id": "S1", "name": "经典赛季", "skills": 16, "builtin": True},
@@ -31,12 +31,16 @@ class FakeIndex:
             ]
         self._official = official
         self._handpicked = handpicked or []
+        self._other = other or []
 
     def get_official(self):
         return list(self._official)
 
     def get_handpicked(self):
         return list(self._handpicked)
+
+    def get_other(self):
+        return list(self._other)
 
 
 class TestMenuLimit:

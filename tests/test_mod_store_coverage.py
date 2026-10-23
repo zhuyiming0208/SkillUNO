@@ -322,6 +322,9 @@ class TestPageBranches:
                          "author_github": "a", "version": "1.0.0",
                          "skills": 1}]
 
+            def get_other(self):
+                return []
+
         menu = MainMenu(Idx())
         menu.selected = 0
         assert menu.current_mod() is not None
@@ -334,6 +337,9 @@ class TestPageBranches:
                 return []
 
             def get_handpicked(self):
+                return []
+
+            def get_other(self):
                 return []
 
         menu = MainMenu(Idx())

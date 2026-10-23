@@ -52,6 +52,8 @@ class TestMenuHandlesW:
                 return []
             def get_handpicked(self):
                 return []
+            def get_other(self):
+                return []
 
         return MainMenu(Idx())
 

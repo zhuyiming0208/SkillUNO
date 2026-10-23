@@ -10,6 +10,7 @@ class MainMenu:
     """主菜单：官方模组区 + 精选模组区 + 操作栏。"""
 
     MAX_HANDPICKED_DISPLAY = 12
+    MAX_OTHER_DISPLAY = 12
     BOX_WIDTH = 60
 
     def __init__(self, mod_index, history_path=None, enabled_path=None, mods_dir=None,
@@ -21,6 +22,7 @@ class MainMenu:
         self.collections_path = collections_path
         self.official = mod_index.get_official()
         self.handpicked = mod_index.get_handpicked()
+        self.other = mod_index.get_other()
         self.selected = 0
 
         # 超过 12 个精选模组时，打印警告，只保留前 12 个
@@ -32,10 +34,19 @@ class MainMenu:
             )
             self.handpicked = self.handpicked[:self.MAX_HANDPICKED_DISPLAY]
 
+        if len(self.other) > self.MAX_OTHER_DISPLAY:
+            print(
+                f"警告：第三方模组超过 {self.MAX_OTHER_DISPLAY} 个"
+                f"（当前 {len(self.other)} 个），"
+                f"只显示前 {self.MAX_OTHER_DISPLAY} 个。"
+            )
+            self.other = self.other[:self.MAX_OTHER_DISPLAY]
+
         self._refresh_state()
         self._load_collections()
 
         self.total_items = (len(self.official) + len(self.handpicked)
+                            + len(self.other)
                             + min(3, len(self._collections)))
         if self.total_items == 0:
             self.total_items = 1
@@ -68,12 +79,23 @@ class MainMenu:
                 lines.append(self._render_mod_item(real_idx, mod))
         lines.append("")
 
+        # 第三方模组区
+        lines.append(colorize("【第三方模组】", "bright_yellow"))
+        if not self.other:
+            lines.append("  暂无第三方模组")
+        else:
+            base = len(self.official) + len(self.handpicked)
+            for i, mod in enumerate(self.other):
+                real_idx = base + i
+                lines.append(self._render_mod_item(real_idx, mod))
+        lines.append("")
+
         # 模组集区
         lines.append(colorize("【模组集】", "bright_yellow"))
         if not self._collections:
             lines.append("  暂无模组集")
         else:
-            base = len(self.official) + len(self.handpicked)
+            base = len(self.official) + len(self.handpicked) + len(self.other)
             for i, c in enumerate(self._collections[:3]):
                 real_idx = base + i
                 lines.append(self._render_collection_item(real_idx, c))
@@ -159,6 +181,9 @@ class MainMenu:
         idx = self.selected - len(self.official)
         if 0 <= idx < len(self.handpicked):
             return self.handpicked[idx]
+        idx -= len(self.handpicked)
+        if 0 <= idx < len(self.other):
+            return self.other[idx]
         return None
 
     def _refresh_state(self):
@@ -231,6 +256,9 @@ class MainMenu:
         if idx < len(self.handpicked):
             return ("handpicked", self.handpicked[idx])
         idx -= len(self.handpicked)
+        if idx < len(self.other):
+            return ("other", self.other[idx])
+        idx -= len(self.other)
         if idx < len(self._collections):
             return ("collection", self._collections[idx])
         return (None, None)

@@ -9,7 +9,22 @@ from uno.mod_store.menu import MainMenu
 
 
 def _find_mods_dir() -> Path:
+    """定位项目 mods 目录。
+
+    优先级：
+      1. 包位置向上找带 pyproject.toml 的项目根 → 同级 mods/
+      2. CWD 向上找带 pyproject.toml 的项目根 → 同级 mods/
+      3. 包位置向上找任何 mods/
+      4. CWD / mods 兜底
+    """
     current = Path(__file__).resolve()
+    for parent in current.parents:
+        if (parent / "pyproject.toml").is_file() and (parent / "mods").is_dir():
+            return parent / "mods"
+    cwd = Path.cwd().resolve()
+    for parent in [cwd] + list(cwd.parents):
+        if (parent / "pyproject.toml").is_file() and (parent / "mods").is_dir():
+            return parent / "mods"
     for parent in current.parents:
         candidate = parent / "mods"
         if candidate.is_dir():

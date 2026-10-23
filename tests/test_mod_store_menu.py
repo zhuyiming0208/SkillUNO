@@ -19,7 +19,7 @@ from uno.mod_store.router import Action
 class FakeModIndex:
     """固定数据的假 ModIndex。"""
 
-    def __init__(self, official=None, handpicked=None):
+    def __init__(self, official=None, handpicked=None, other=None):
         if official is None:
             official = [
                 {"id": "S1", "name": "经典赛季", "skills": 16, "builtin": True},
@@ -33,6 +33,7 @@ class FakeModIndex:
             ]
         self._official = official
         self._handpicked = handpicked
+        self._other = other or []
 
     def get_official(self):
         return list(self._official)
@@ -40,8 +41,11 @@ class FakeModIndex:
     def get_handpicked(self):
         return list(self._handpicked)
 
+    def get_other(self):
+        return list(self._other)
+
     def get_all(self):
-        return self.get_official() + self.get_handpicked()
+        return self.get_official() + self.get_handpicked() + self.get_other()
 
 
 def _make_menu():

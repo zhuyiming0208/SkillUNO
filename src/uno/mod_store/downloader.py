@@ -129,6 +129,10 @@ def _try_download(url, tmp_path):
         return (False, f"网络连接失败：{e}")
     except Exception as e:
         _safe_remove(tmp_path)
+        # socket 层网络异常（ConnectionResetError / TimeoutError / 其他 OSError）
+        # 语义上属于网络连接失败，而非通用下载失败。
+        if isinstance(e, (ConnectionResetError, TimeoutError, OSError)):
+            return (False, f"网络连接失败：{e}")
         return (False, f"下载失败：{e}")
 
 

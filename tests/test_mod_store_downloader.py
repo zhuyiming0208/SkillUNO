@@ -298,3 +298,38 @@ class TestEnableMod:
                                 pending_dir=str(tmp_path / "none"))
         assert ok is False
         assert "待启用文件不存在" in msg
+
+class TestNetworkFallback:
+    """v1.15.1 新增：网络异常 fallback 覆盖。"""
+
+    def test_download_mod_fallback_on_network_error(self, tmp_path):
+        """第一个 URL 抛 ConnectionResetError，第二个 URL 成功。"""
+        mod = {"ID": "X", "author_github": "u",
+               "repo": "https://github.com/u/r"}
+        calls = [0]
+
+        def fake_open(req, timeout=None):
+            calls[0] += 1
+            if calls[0] == 1:
+                raise ConnectionResetError("Connection reset by peer")
+            return _FakeResp(b'SEASON_ID = "X"\n')
+
+        with patch("uno.mod_store.downloader.urlopen", side_effect=fake_open):
+            ok, msg = dl.download_mod(mod, pending_dir=str(tmp_path))
+        assert ok is True
+        assert os.path.isfile(msg)
+        assert calls[0] == 2
+
+    def test_download_mod_all_urls_fail(self, tmp_path):
+        """所有 URL 都抛 ConnectionResetError，最终返回网络连接失败。"""
+        mod = {"ID": "X", "author_github": "u",
+               "repo": "https://github.com/u/r"}
+
+        def fake_open(req, timeout=None):
+            raise ConnectionResetError("Connection reset by peer")
+
+        with patch("uno.mod_store.downloader.urlopen", side_effect=fake_open):
+            ok, msg = dl.download_mod(mod, pending_dir=str(tmp_path))
+        assert ok is False
+        assert msg.startswith("网络连接失败：")
+

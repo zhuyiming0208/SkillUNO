@@ -86,16 +86,6 @@ body {
     gap: 1rem;
 }
 
-@media (max-width: 900px) {
-    .mod-grid { grid-template-columns: repeat(2, 1fr); }
-}
-
-@media (max-width: 600px) {
-    .mod-grid { grid-template-columns: 1fr; }
-    body { padding: 0 1rem; }
-    .logo { font-size: 1.6rem; }
-}
-
 /* ========== 模组卡片 ========== */
 .mod-card {
     background: var(--bg-card);
@@ -730,7 +720,6 @@ a:not(.mod-card):not(.collection-card):not(.mod-in-collection):not(.back-link):n
 }
 
 /* ---------- 2. 响应式 ---------- */
-.mod-grid { grid-template-columns: repeat(3, 1fr); }
 @media (max-width: 1024px) {
     .mod-grid { grid-template-columns: repeat(2, 1fr); }
 }

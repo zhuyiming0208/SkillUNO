@@ -61,6 +61,11 @@ def insert_new_entry(path, ver, date, subject, details, dry_run=False):
         return
     text = path.read_text(encoding='utf-8')
 
+    # 防重复：同一版本号已在历史中则跳过
+    if re.search(rf'^## v{re.escape(ver)}(?:\s|（|$)', text, re.MULTILINE):
+        print(f"  [跳过] 版本历史中已存在 v{ver}，无需重复插入")
+        return
+
     body = subject
     if details:
         details_text = details.replace('\\n', '\n')
@@ -83,9 +88,10 @@ def insert_new_entry(path, ver, date, subject, details, dry_run=False):
 
 def ask_and_run_git(commit_msg):
     print()
-    answer = input("是否立即 git 提交并推送？(y/N) ").strip().lower()
+    answer = input("是否立即 git 提交并推送？(y/N，回车跳过) ").strip().lower()
     if answer != 'y':
-        print("已跳过 git 操作")
+        print("已跳过 git 操作（如需预览不写文件，请用 --dry-run；")
+        print("             如需只改文件不提交，请去掉 --git 参数）")
         return
     try:
         print("→ git add -A")

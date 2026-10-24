@@ -7,6 +7,8 @@
  * 匹配字段：ID / id / name / author / author_github / tags
  * 大小写不敏感
  */
+// 注意：此函数匹配字段包含 tags，因此当与外部标签栏筛选同时使用时，
+// 会天然形成 AND 逻辑。若未来修改匹配字段，需留意此副作用。
 function filterMods(mods, keyword) {
     if (!keyword || !keyword.trim()) return mods;
     const kw = keyword.trim().toLowerCase();

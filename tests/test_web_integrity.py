@@ -121,3 +121,26 @@ def test_collections_mods_exist():
             if not (MODS_DIR / f"{mid}.json").exists():
                 missing.append(f"{c['id']} → {mid}")
     assert not missing, f"模组集引用了不存在的模组：{missing}"
+
+# ===== v1.16.0 标签筛选静态检查 =====
+
+def test_mods_list_has_tag_filter_html():
+    """mods 列表页必须包含标签栏容器与 data-tag 钩子。"""
+    html = (WEB_DIR / "mods" / "index.html").read_text(encoding="utf-8")
+    assert 'id="tag-list"' in html, "缺少标签栏容器 #tag-list"
+    assert 'data-tag=' in html, "缺少 data-tag 钩子"
+
+
+def test_search_js_has_tag_functions():
+    """search.js 必须定义 extractTags 与 filterByTag。"""
+    js = (WEB_DIR / "assets" / "js" / "search.js").read_text(encoding="utf-8")
+    assert "function extractTags" in js, "缺少 extractTags()"
+    assert "function filterByTag" in js, "缺少 filterByTag()"
+
+
+def test_mods_list_loads_search_js():
+    """mods 列表页必须引入 search.js（防漏加 script 标签）。"""
+    html = (WEB_DIR / "mods" / "index.html").read_text(encoding="utf-8")
+    assert re.search(r'<script[^>]+src=["\'][^"\']*search\.js', html), \
+        "mods/index.html 未引入 search.js"
+

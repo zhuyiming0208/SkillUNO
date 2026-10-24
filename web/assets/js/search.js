@@ -31,3 +31,27 @@ function debounce(fn, delay) {
         timer = setTimeout(() => fn.apply(this, args), delay);
     };
 }
+
+
+/**
+ * 从模组列表中提取所有不重复标签，按字母序排列。
+ */
+function extractTags(mods) {
+    const set = new Set();
+    for (const m of mods) {
+        if (Array.isArray(m.tags)) {
+            for (const t of m.tags) {
+                if (t && typeof t === 'string') set.add(t);
+            }
+        }
+    }
+    return Array.from(set).sort((a, b) => a.localeCompare(b, 'zh-CN'));
+}
+
+/**
+ * 按标签过滤。tag 为空时原样返回。
+ */
+function filterByTag(mods, tag) {
+    if (!tag) return mods;
+    return mods.filter(m => Array.isArray(m.tags) && m.tags.includes(tag));
+}

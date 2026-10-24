@@ -25,7 +25,13 @@
         </div>
     </header>
 
-    <main>
+    <main class="list-layout">
+        <aside id="tag-bar" class="tag-bar" aria-label="按标签筛选">
+            <p class="tag-bar-title">标签</p>
+            <div id="tag-list" class="tag-list">
+                <button type="button" class="tag-btn tag-all active" data-tag="">全部</button>
+            </div>
+        </aside>
         <div id="mod-grid" class="mod-grid">
             <p class="loading">加载中...</p>
         </div>
@@ -51,11 +57,15 @@
             const clearBtn = document.getElementById('clear-btn');
             const countDisplay = document.getElementById('count-display');
 
+            const tagList = document.getElementById('tag-list');
+
             // --- URL 参数恢复 ---
             const params = new URLSearchParams(location.search);
             const initialQ = params.get('q') || '';
+            const initialTag = params.get('tag') || '';
             searchBox.value = initialQ;
             if (initialQ) clearBtn.hidden = false;
+            let selectedTag = initialTag;
 
             // --- 数据加载 ---
             let allMods = [];
@@ -68,6 +78,28 @@
                 return;
             }
 
+            // --- 标签栏渲染 ---
+            function renderTagBar() {
+                const tags = extractTags(allMods);
+                // 清空除「全部」外的按钮
+                tagList.querySelectorAll('.tag-btn:not(.tag-all)').forEach(el => el.remove());
+                for (const t of tags) {
+                    const btn = document.createElement('button');
+                    btn.type = 'button';
+                    btn.className = 'tag-btn';
+                    btn.dataset.tag = t;
+                    btn.textContent = t;
+                    tagList.appendChild(btn);
+                }
+                syncTagActive();
+            }
+
+            function syncTagActive() {
+                tagList.querySelectorAll('.tag-btn').forEach(btn => {
+                    btn.classList.toggle('active', btn.dataset.tag === selectedTag);
+                });
+            }
+
             // --- 更新视图 ---
             function update(mods, keyword) {
                 if (mods.length === 0) {
@@ -77,20 +109,31 @@
                 }
                 countDisplay.textContent = `共 ${mods.length} 个模组`;
 
-                if (keyword && keyword.trim()) {
-                    history.replaceState(null, '', `?q=${encodeURIComponent(keyword)}`);
-                } else {
-                    history.replaceState(null, '', location.pathname);
-                }
+                const urlParams = new URLSearchParams();
+                if (keyword && keyword.trim()) urlParams.set('q', keyword.trim());
+                if (selectedTag) urlParams.set('tag', selectedTag);
+                const qs = urlParams.toString();
+                history.replaceState(null, '', qs ? `?${qs}` : location.pathname);
             }
 
             function apply(keyword) {
-                const filtered = filterMods(allMods, keyword);
+                const tagged = filterByTag(allMods, selectedTag);
+                const filtered = filterMods(tagged, keyword);
                 update(filtered, keyword);
             }
 
             // --- 初始渲染 ---
+            renderTagBar();
             apply(initialQ);
+
+            // --- 标签点击 ---
+            tagList.addEventListener('click', (e) => {
+                const btn = e.target.closest('.tag-btn');
+                if (!btn) return;
+                selectedTag = btn.dataset.tag || '';
+                syncTagActive();
+                apply(searchBox.value);
+            });
 
             // --- 输入事件（防抖 200ms）---
             const debouncedApply = debounce(apply, 200);

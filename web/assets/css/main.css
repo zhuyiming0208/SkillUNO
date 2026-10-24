@@ -796,3 +796,104 @@ a:not(.mod-card):not(.collection-card):not(.mod-in-collection):not(.back-link):n
     input { font-size: 16px; }
     .meta-row { gap: 0.15rem; }
 }
+
+/* ========== 标签筛选栏（mods 列表页） ========== */
+.list-layout {
+    display: grid;
+    grid-template-columns: 160px 1fr;
+    gap: 1.5rem;
+    align-items: start;
+}
+
+.tag-bar {
+    position: sticky;
+    top: 1rem;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--bg-elev);
+    padding: 0.75rem;
+    max-height: calc(100vh - 2rem);
+    overflow-y: auto;
+}
+
+.tag-bar-title {
+    color: var(--fg-dim);
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 0.6rem;
+    padding-bottom: 0.4rem;
+    border-bottom: 1px dashed var(--border);
+}
+
+.tag-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+.tag-btn {
+    font-family: var(--mono);
+    font-size: 0.85rem;
+    color: var(--fg-dim);
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 0.3rem 0.6rem;
+    text-align: left;
+    cursor: pointer;
+    transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+
+.tag-btn:hover {
+    color: var(--cyan);
+    border-color: var(--border-hi);
+}
+
+.tag-btn.active {
+    color: var(--bg);
+    background: var(--cyan);
+    border-color: var(--cyan);
+    box-shadow: 0 0 8px rgba(0, 217, 255, 0.6);
+}
+
+.tag-all {
+    font-weight: 700;
+    margin-bottom: 0.3rem;
+}
+
+@media (max-width: 768px) {
+    .list-layout {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+    .tag-bar {
+        position: static;
+        max-height: none;
+        padding: 0.5rem;
+    }
+    .tag-bar-title {
+        margin-bottom: 0.4rem;
+    }
+    .tag-list {
+        flex-direction: row;
+        overflow-x: auto;
+        flex-wrap: nowrap;
+        gap: 0.4rem;
+        -webkit-overflow-scrolling: touch;
+    }
+    .tag-list::-webkit-scrollbar {
+        height: 4px;
+    }
+    .tag-list::-webkit-scrollbar-thumb {
+        background: var(--border);
+        border-radius: 2px;
+    }
+    .tag-btn {
+        white-space: nowrap;
+        flex-shrink: 0;
+    }
+    .tag-all {
+        margin-bottom: 0;
+    }
+}

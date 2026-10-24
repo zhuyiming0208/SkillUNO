@@ -13,7 +13,7 @@
     - pyproject.toml
     - src/uno/main.py
     - docs/DEVELOPER_GUIDE.md
-    - docs/VersionBriefHistory.md
+    - CHANGELOG.md
     如果给了标题，会在版本历史顶部插入新条目。
 """
 import argparse
@@ -54,6 +54,19 @@ def replace_pattern(path, pattern, repl, desc, dry_run=False):
     return True
 
 
+def _strip_commit_prefix(subject):
+    """去掉 conventional commit 前缀（feat: / fix(scope): 等），
+    CHANGELOG 条目直接用描述文本，保留 Keep a Changelog 风格。"""
+    if not subject:
+        return subject
+    m = re.match(
+        r'^(?:feat|fix|docs|chore|style|refactor|perf|test|build|ci|revert)'
+        r'(?:\([^)]*\))?!?:\s*',
+        subject,
+    )
+    return subject[m.end():] if m else subject
+
+
 def insert_new_entry(path, ver, date, subject, details, dry_run=False):
     """在版本历史顶部插入新条目。"""
     if not path.exists():
@@ -62,18 +75,18 @@ def insert_new_entry(path, ver, date, subject, details, dry_run=False):
     text = path.read_text(encoding='utf-8')
 
     # 防重复：同一版本号已在历史中则跳过
-    if re.search(rf'^## v{re.escape(ver)}(?:\s|（|$)', text, re.MULTILINE):
+    if re.search(rf'^## \[?v{re.escape(ver)}\]?(?:\s|-|（|$)', text, re.MULTILINE):
         print(f"  [跳过] 版本历史中已存在 v{ver}，无需重复插入")
         return
 
-    body = subject
+    body = _strip_commit_prefix(subject)
     if details:
         details_text = details.replace('\\n', '\n')
         body += f"\n\n{details_text}"
 
-    entry = f"## v{ver}（{date}）\n\n{body}\n\n---\n\n"
+    entry = f"## [v{ver}] - {date}\n\n{body}\n\n---\n\n"
 
-    m = re.search(r'^## v[\d.]+', text, re.MULTILINE)
+    m = re.search(r'^## \[?v[\d.]+', text, re.MULTILINE)
     if not m:
         print(f"  [跳过] {path} — 找不到 ## vX.Y.Z 条目")
         return
@@ -167,13 +180,7 @@ def main():
     replace_pattern(guide, r'\*\*最后更新：[\d-]+\*\*',
                     f'**最后更新：{date}**', "头部最后更新", args.dry_run)
 
-    history = ROOT / "docs/VersionBriefHistory.md"
-    replace_pattern(history, r'到 v[\d.]+ 期间',
-                    f'到 v{ver} 期间', "顶部版本范围", args.dry_run)
-    replace_pattern(history, r'\*\*当前版本：v[\d.]+\*\*（[^）]+）',
-                    f'**当前版本：v{ver}**（{date}）', "当前版本标注", args.dry_run)
-    replace_pattern(history, r'最后更新：[\d-]+ · v[\d.]+',
-                    f'最后更新：{date} · v{ver}', "尾部最后更新", args.dry_run)
+    history = ROOT / "CHANGELOG.md"
 
     if args.subject:
         print()

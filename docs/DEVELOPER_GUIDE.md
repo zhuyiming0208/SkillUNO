@@ -1,10 +1,10 @@
 # SkillUNO 开发者文档
 
-**版本：v1.16.0**
+**版本：v1.16.1**
 **最后更新：2026-10-24**
 
 本文档面向希望为 SkillUNO 编写 Mod、自定义 UI 或扩展游戏核心的开发者。如果你是玩家，请先阅读 `docs/FAQ.md`。  
-如需查看历史修复记录，请参阅 `docs/VersionBriefHistory.md`。
+如需查看历史修复记录，请参阅 [`CHANGELOG.md`](../CHANGELOG.md)。
 
 ---
 
@@ -12,7 +12,7 @@
 
 SkillUNO 是一个基于 Python 的 UNO 卡牌游戏框架，核心设计理念是 **事件驱动 + Mod 化**。所有技能、赛季、甚至 UI 都可以通过简单的 Python 类进行扩展，无需修改核心引擎。
 
-当前稳定版本：**v1.16.0**
+当前稳定版本：**v1.16.1**
 
 ---
 
@@ -26,7 +26,6 @@ SkillUNO
 ├── docs
 │   ├── DEVELOPER_GUIDE.md
 │   ├── FAQ.md
-│   ├── VersionBriefHistory.md
 │   ├── how_to_go_from_a_beginner_to_an_expert.md
 │   └── screenshots
 │       ├── gameplay1.jpg
@@ -682,13 +681,53 @@ v1.3.2 修复了 ERROR-021 与 ERROR-022：
 ERROR-021 run() 淘汰分支不再硬编码 winner='?'，动态推断实际赢家
 ERROR-022 热座模式下为每位人类玩家分别记录胜负到存档
 
-完整的修复记录（包括 ERROR-001 ~ ERROR-020）请参阅 VersionBriefHistory.md。
+完整的修复记录（包括 ERROR-001 ~ ERROR-020）请参阅 [`CHANGELOG.md`](../CHANGELOG.md)。
 
 ---
 
-十二、后续版本计划
+十二、GitHub Action 自动发现机制
 
-参见 VersionBriefHistory.md 的末尾「后续版本计划」一节，包含：
+SkillUNO 的第三方模组商店数据（`mods/mod_idx.json` 的 `other` 列表 + 各模组元数据 JSON）由 GitHub Action 每日自动维护，无需人工提 PR。
+
+### 12.1 触发条件
+
+仓库满足以下全部条件才会被自动收录：
+
+1. 仓库添加 GitHub topic：`skilluno-mod`
+2. 仓库根目录存在 `skilluno_mod.json`
+3. 该文件的 `author_github` 字段与仓库 owner 一致（防冒名）
+4. 必填字段齐全（`ID` / `name` / `description` / `author` / `author_github` / `repo` / `version` / `micover` / `lacover` / `skills`）
+5. `ID` 不与官方保留值（`S1` / `S2` / `S3` / `S4`）冲突
+
+### 12.2 运行流程
+
+`.github/workflows/discover-mods.yml` 每日 UTC 00:00 触发：
+
+1. 执行 `tools/discover_mods.py`
+2. 通过 GitHub Search API 分页搜索 `topic:skilluno-mod` 的所有仓库
+3. 逐个拉取 `skilluno_mod.json` 并校验
+4. 完全重建 `mod_idx.json` 的 `other` 列表（`handpicked` 保持不变）
+5. 失效仓库（删除 topic / 删仓库 / 元数据不合格）自动从 `other` 移除，并删除对应的 `mods/{ID}.json`
+6. 通过 `peter-evans/create-pull-request` 提交 PR，分支固定为 `auto-discover-mods`
+
+### 12.3 人工审核
+
+- 自动 PR 会列出「新增 / 更新 / 移除」三类变更
+- 重点检查「移除」列表，确认没有误删
+- 无变更时不创建空 PR
+- 合并后自动删除分支
+
+### 12.4 退出自动发现
+
+删除 `skilluno-mod` topic、删除 `skilluno_mod.json` 或删除仓库，下次扫描时自动从 `other` 移除。
+
+想上首页「精选模组」（`handpicked`）需人工精选，不由自动流程维护——提 PR 修改 `mods/mod_idx.json` 的 `handpicked`，或联系维护者。
+
+---
+
+十三、后续版本计划
+
+参见 [`CHANGELOG.md`](../CHANGELOG.md) 的末尾「后续版本计划」一节，包含：
 
 · TODO-001：成就按玩家分别评估（热座模式）→ v1.4.0
 · TODO-002：AI 战术增强 → v1.4.0+
@@ -699,7 +738,7 @@ ERROR-022 热座模式下为每位人类玩家分别记录胜负到存档
 
 ---
 
-十三、许可证
+十四、许可证
 
 SkillUNO 为个人项目，代码仅供学习和参考。
 

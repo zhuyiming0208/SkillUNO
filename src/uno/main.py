@@ -4,7 +4,7 @@ from uno.replay import GameRecorder, GameReplayer
 from uno.ui import ConsoleUI
 from uno.paths import find_mods_dir
 
-VERSION = "v1.16.1"
+VERSION = "v1.16.2"
 
 def main():
     print(f"欢迎来到 SkillUNO {VERSION}！")

@@ -173,7 +173,8 @@ class Skill:
 
 
 class Player:
-    def __init__(self, name: str, is_human: bool = False, ui: ConsoleUI = None):
+    def __init__(self, name: str, is_human: bool = False, ui: ConsoleUI = None,
+                 ai_strategy=None):
         self.name = name
         self.is_human = is_human
         self.ui = ui or ConsoleUI()
@@ -181,6 +182,14 @@ class Player:
         self.skills: List[Skill] = []
         self.eliminated = False
         self.hand_limit = 15
+        # AI 策略注入：None 时默认 SimpleAI；class 则实例化；instance 直接使用。
+        # 延迟导入避免循环依赖（core <-> ai.simple）
+        if ai_strategy is None:
+            from uno.ai.simple import SimpleAI
+            ai_strategy = SimpleAI()
+        elif isinstance(ai_strategy, type):
+            ai_strategy = ai_strategy()
+        self.ai_strategy = ai_strategy
 
     def draw_cards(self, cards: List[Card]):
         self.hand.extend(cards)
@@ -349,19 +358,8 @@ class Player:
                 ui.show("输入无效。")
 
     def ai_choose(self, top_card: Card, current_color: str) -> Optional[int]:
-        usable = [s for s in self.skills if not s.is_consumed and not s.is_deleted
-                  and s.type in (SkillType.ACTIVE, SkillType.HYBRID)
-                  and s.can_trigger(GameEvent.TURN_START, {'player': self})]
-        if usable:
-            best_skill = max(usable, key=lambda s: s.evaluate_urgency(self.game))
-            if best_skill.evaluate_urgency(self.game) > 20:
-                self.game.skill_manager.execute_skill(best_skill, GameEvent.TURN_START, {'player': self})
-                if len(self.hand) == 0:
-                    return None
-        for i, card in enumerate(self.hand):
-            if card.is_playable_on(top_card, current_color):
-                return i
-        return None
+        """委托给 AI 策略（默认 SimpleAI）。"""
+        return self.ai_strategy.choose_turn(self, self.game, top_card, current_color)
 
     def choose_color(self) -> str:
         if self.is_human:
@@ -371,13 +369,7 @@ class Player:
                 if c in ['0', '1', '2', '3']:
                     return Card.COLORS[int(c)]
                 self.ui.show("无效。")
-        else:
-            color_count = {c: 0 for c in Card.COLORS}
-            for card in self.hand:
-                if card.color in color_count:
-                    color_count[card.color] += 1
-            best = max(color_count, key=color_count.get)
-            return best
+        return self.ai_strategy.choose_color(self)
 
 
 class SkillManager:
@@ -496,7 +488,7 @@ class UNOGame:
                  recorder: 'GameRecorder' = None, players: List[str] = None,
                  human_ui: ConsoleUI = None, ai_ui: ConsoleUI = None,
                  hand_limit: int = 15, initial_hand_size: int = 7, initial_skill_count: int = 3,
-                 enabled_path: str = None):
+                 enabled_path: str = None, ai_strategy=None):
         if enabled_seasons is None:
             enabled_seasons = ['S1']
         enabled_seasons = list(set(enabled_seasons))
@@ -527,10 +519,10 @@ class UNOGame:
         else:
             self.hotseat = False
             self.players = [
-                Player(human_name, is_human=True, ui=self.ui),
-                Player("电脑A", ui=ai_ui),
-                Player("电脑B", ui=ai_ui),
-                Player("电脑C", ui=ai_ui)
+                Player(human_name, is_human=True, ui=self.ui, ai_strategy=ai_strategy),
+                Player("电脑A", ui=ai_ui, ai_strategy=ai_strategy),
+                Player("电脑B", ui=ai_ui, ai_strategy=ai_strategy),
+                Player("电脑C", ui=ai_ui, ai_strategy=ai_strategy)
             ]
 
         for p in self.players:

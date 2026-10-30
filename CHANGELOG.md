@@ -9,6 +9,17 @@
 
 ---
 
+## [v1.16.2] - 2026-10-30
+
+提取 AI 策略模式框架，抽离 SimpleAI
+
+- 新增 src/uno/ai/ 模块（base.py / simple.py）
+- Player 支持 ai_strategy 注入，默认 SimpleAI
+- UNOGame 支持 ai_strategy 参数透传
+- 新增 7 个框架测试
+
+---
+
 ## [v1.16.1] - 2026-10-24
 
 史诗级文档重构与发版路径修复

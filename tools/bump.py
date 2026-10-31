@@ -99,7 +99,7 @@ def insert_new_entry(path, ver, date, subject, details, dry_run=False):
     print(f"  [{tag}] {path} — 插入 v{ver} 条目")
 
 
-def ask_and_run_git(commit_msg):
+def ask_and_run_git(commit_msg, version=None, do_tag=True):
     print()
     answer = input("是否立即 git 提交并推送？(y/N，回车跳过) ").strip().lower()
     if answer != 'y':
@@ -116,6 +116,33 @@ def ask_and_run_git(commit_msg):
         print("✅ 已提交并推送")
     except subprocess.CalledProcessError as e:
         print(f"❌ git 操作失败：{e}")
+        return
+    except Exception as e:
+        print(f"❌ 意外错误：{e}")
+        return
+
+    if not do_tag or version is None:
+        return
+
+    tag_name = f"v{version}"
+    result = subprocess.run(
+        ["git", "tag", "-l", tag_name],
+        capture_output=True, text=True, cwd=ROOT)
+    if result.stdout.strip():
+        print(f"[跳过] tag {tag_name} 已存在")
+        return
+
+    tag_msg = f"{tag_name}: {commit_msg}" if commit_msg else tag_name
+    try:
+        print(f"→ git tag -a {tag_name} -m {tag_msg!r}")
+        subprocess.run(["git", "tag", "-a", tag_name, "-m", tag_msg],
+                       check=True, cwd=ROOT)
+        print(f"→ git push origin {tag_name}")
+        subprocess.run(["git", "push", "origin", tag_name],
+                       check=True, cwd=ROOT)
+        print(f"✅ 已打 tag {tag_name} 并推送（触发 PyPI 发布）")
+    except subprocess.CalledProcessError as e:
+        print(f"❌ tag 操作失败：{e}")
     except Exception as e:
         print(f"❌ 意外错误：{e}")
 
@@ -140,7 +167,9 @@ def main():
     parser.add_argument("--dry-run", action="store_true",
                         help="只显示改动，不写入文件")
     parser.add_argument("--git", action="store_true",
-                        help="完成后询问是否 git 提交并推送")
+                        help="完成后询问是否 git 提交并推送，默认同时打 tag 推送")
+    parser.add_argument("--no-tag", action="store_true",
+                        help="配合 --git 使用：只提交推送，不打 tag（不触发 PyPI 发布）")
     args = parser.parse_args()
 
     try:
@@ -195,9 +224,11 @@ def main():
 
     if args.git:
         commit_msg = args.subject or f"chore: 版本号升级到 v{ver}"
-        ask_and_run_git(commit_msg)
+        ask_and_run_git(commit_msg, version=ver, do_tag=not args.no_tag)
     else:
         print(f"\n下一步：git add -A && git commit -m '...' && git push")
+        if not args.no_tag:
+            print(f"        git tag -a v{ver} -m 'v{ver}: ...' && git push origin v{ver}")
 
 
 if __name__ == "__main__":

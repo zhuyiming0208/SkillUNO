@@ -9,6 +9,19 @@
 
 ---
 
+## [v1.18.0] - 2026-10-31
+
+MCTS 实装与 AI 难度 UI 选择
+
+- 新增 MctsAI（max_time=1.0, max_iterations=100）
+- POMDP 随机发牌推断 + HeuristicAI rollout 防递归
+- 主菜单增加 1/2/3 难度选择，地狱难度有红字警告
+- ConsoleUI/NullUI 新增 show_error 方法
+- 新增 7 个 MCTS 单元测试
+- tools/ab_test.py 支持 mh/m3 模式，1v3 胜率 70%
+
+---
+
 ## [v1.17.0] - 2026-10-30
 
 新增启发式 AI HeuristicAI

@@ -4,7 +4,19 @@ from uno.replay import GameRecorder, GameReplayer
 from uno.ui import ConsoleUI
 from uno.paths import find_mods_dir
 
-VERSION = "v1.17.0"
+VERSION = "v1.18.0"
+
+def _make_ai(level: str):
+    """按难度返回 AI 策略实例。level: '1'/'2'/'3'。"""
+    if level == '1':
+        from uno.ai.simple import SimpleAI
+        return SimpleAI()
+    if level == '3':
+        from uno.ai.mcts import MctsAI
+        return MctsAI(max_iterations=100, max_time=1.0)
+    from uno.ai.heuristic import HeuristicAI
+    return HeuristicAI()
+
 
 def main():
     print(f"欢迎来到 SkillUNO {VERSION}！")
@@ -39,6 +51,21 @@ def main():
     if not enabled_seasons:
         print("未选择任何赛季，默认启用 S1。")
         enabled_seasons = ['S1']
+
+    # --- AI 难度选择 ---
+    print()
+    print("请选择 AI 难度：")
+    print("  1. 简单 (无脑出牌，适合新手)")
+    print("  2. 普通 (会算计、卡下家，推荐)")
+    print("  3. 地狱 (MCTS 神级算法，极强！)")
+    diff_choice = input("请输入编号（默认 2）: ").strip()
+    if diff_choice == '3':
+        print("\033[91m⚠️ 警告：地狱难度 AI 会进行深度推演，每回合可能会思考 1~2 秒，请耐心等待。\033[0m")
+        ai_strategy = _make_ai('3')
+    elif diff_choice == '1':
+        ai_strategy = _make_ai('1')
+    else:
+        ai_strategy = _make_ai('2')
 
     # --- 调试模式 ---
     debug_choice = input("是否开启调试模式？(0关闭, 1开启，默认0): ").strip()
@@ -80,6 +107,7 @@ def main():
         debug=debug,
         use_rich_ui=use_rich,
         recorder=recorder,
+        ai_strategy=ai_strategy,
     )
     game.run()
 

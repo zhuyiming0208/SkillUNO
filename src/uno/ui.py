@@ -6,6 +6,9 @@ class ConsoleUI:
     def show(self, text=""):
         print(text)
 
+    def show_error(self, text=""):
+        print(f"\033[91m{text}\033[0m")
+
     def input(self, prompt=""):
         return input(prompt)
 
@@ -22,6 +25,9 @@ class ConsoleUI:
 class NullUI(ConsoleUI):
     """给 AI 使用的哑巴 UI：不显示、不输入"""
     def show(self, text=""):
+        pass
+
+    def show_error(self, text=""):
         pass
 
     def input(self, prompt=""):

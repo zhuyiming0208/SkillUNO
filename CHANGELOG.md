@@ -9,6 +9,16 @@
 
 ---
 
+## [v1.18.2] - 2026-10-31
+
+修复 MCTS 在 RichUI 下的深拷贝崩溃
+
+- 给 Deck / Player / UNOGame 加 __deepcopy__，跳过 ui/recorder
+- RichUI 的 RichConsole 含 RLock，直接 deepcopy 会崩
+- 新增 test_mcts_with_rich_ui 回归测试
+
+---
+
 ## [v1.18.1] - 2026-10-31
 
 ab_test 默认切至 m3 模式

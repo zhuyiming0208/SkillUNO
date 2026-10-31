@@ -110,3 +110,36 @@ def test_mcts_node_ucb1():
     child.wins = 3.0
     score = child.ucb1()
     assert 0.6 <= score <= 5.0
+
+def test_mcts_with_rich_ui():
+    """回归：RichUI（含 threading.RLock）下 deepcopy 不崩。"""
+    import copy
+    from uno.ui import RichUI, NullUI
+    g = UNOGame(debug=False, use_rich_ui=False,
+                players=["A", "B", "C", "D"], enabled_seasons=["S1"])
+    g.setup()
+    # 手动装上 RichUI 模拟真实游戏
+    g.ui = RichUI()
+    for p in g.players:
+        p.ui = RichUI()
+        p.is_human = False
+    g.current_player_idx = 0
+
+    # 直接 deepcopy 不崩
+    g2 = copy.deepcopy(g)
+    assert isinstance(g2.ui, NullUI)
+    for p in g2.players:
+        assert isinstance(p.ui, NullUI)
+
+    # 原对象未被改
+    assert isinstance(g.ui, RichUI)
+    for p in g.players:
+        assert isinstance(p.ui, RichUI)
+
+    # MCTS 决策不崩
+    ai = MctsAI(max_iterations=5, max_time=0.2)
+    idx = ai.choose_turn(g.players[0], g, g.discard_pile[-1], g.current_color)
+    assert idx is not None or idx is None  # 不崩即可
+    # 原 game 仍持有 RichUI
+    assert isinstance(g.ui, RichUI)
+

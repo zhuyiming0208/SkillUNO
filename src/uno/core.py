@@ -68,6 +68,18 @@ class Deck:
         self.build()
         self.shuffle()
 
+    def __deepcopy__(self, memo):
+        import copy as _copy
+        cls = self.__class__
+        result = cls.__new__(cls)
+        memo[id(self)] = result
+        for k, v in self.__dict__.items():
+            if k == "ui":
+                setattr(result, k, None)
+            else:
+                setattr(result, k, _copy.deepcopy(v, memo))
+        return result
+
     def _notify(self, msg: str):
         if self.ui is not None:
             self.ui.show(msg)
@@ -190,6 +202,19 @@ class Player:
         elif isinstance(ai_strategy, type):
             ai_strategy = ai_strategy()
         self.ai_strategy = ai_strategy
+
+    def __deepcopy__(self, memo):
+        import copy as _copy
+        from .ui import NullUI
+        cls = self.__class__
+        result = cls.__new__(cls)
+        memo[id(self)] = result
+        for k, v in self.__dict__.items():
+            if k == "ui":
+                setattr(result, k, NullUI())
+            else:
+                setattr(result, k, _copy.deepcopy(v, memo))
+        return result
 
     def draw_cards(self, cards: List[Card]):
         self.hand.extend(cards)
@@ -546,6 +571,21 @@ class UNOGame:
 
         self.achievements = AchievementManager(self, get_core_achievements())
         self.achievements.add_achievements(mod_achievements)
+
+    def __deepcopy__(self, memo):
+        import copy as _copy
+        from .ui import NullUI
+        cls = self.__class__
+        result = cls.__new__(cls)
+        memo[id(self)] = result
+        for k, v in self.__dict__.items():
+            if k == "ui":
+                setattr(result, k, NullUI())
+            elif k == "recorder":
+                setattr(result, k, None)
+            else:
+                setattr(result, k, _copy.deepcopy(v, memo))
+        return result
 
     def broadcast(self, message: str):
         seen_ids = set()

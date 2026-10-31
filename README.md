@@ -204,6 +204,23 @@ python -m pytest tests/ -v
 ```bash
 setver 1.17.0 "新功能说明" "- 详情 1\n- 详情 2" --git
 ```
+
+### 发版流程
+
+1. 升级版本号并提交（推 main 不触发 PyPI 发布）：
+
+```bash
+setver X.Y.Z "功能说明" "- 详情" --git
+```
+
+2. 打 tag 并推送（触发 PyPI 发布）：
+
+```bash
+git tag -a vX.Y.Z -m "vX.Y.Z: 功能说明"
+git push origin vX.Y.Z
+```
+
+PyPI 发布由 `.github/workflows/publish.yml` 自动完成，触发条件是 tag 推送（`v*`）。
 ---
 
 ## 兼容性

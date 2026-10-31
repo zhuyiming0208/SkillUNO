@@ -60,6 +60,33 @@ class Card:
         return False
 
 
+# deepcopy 时跳过的属性（这些属性持有外部资源或不可拷贝对象）
+# - ui: RichConsole 内部有 threading.RLock，deepcopy 会崩
+# - recorder: GameRecorder 可能持有文件句柄或状态
+_UNCOPYABLE_ATTRS = {"ui", "recorder"}
+
+
+def _safe_deepcopy(obj, memo, ui_factory):
+    """通用深拷贝：跳过 _UNCOPYABLE_ATTRS 里的属性。
+
+    ui_factory: 创建 ui 替代品的可调用对象。
+        - Deck 用 lambda: None（_notify 会 fallback 到 print）
+        - Player / UNOGame 用 NullUI（静音）
+    """
+    import copy as _copy
+    cls = obj.__class__
+    result = cls.__new__(cls)
+    memo[id(obj)] = result
+    for k, v in obj.__dict__.items():
+        if k == "ui":
+            setattr(result, k, ui_factory())
+        elif k in _UNCOPYABLE_ATTRS:
+            setattr(result, k, None)
+        else:
+            setattr(result, k, _copy.deepcopy(v, memo))
+    return result
+
+
 class Deck:
     def __init__(self, discard_pile: List[Card] = None, ui: ConsoleUI = None):
         self.cards: List[Card] = []
@@ -69,16 +96,7 @@ class Deck:
         self.shuffle()
 
     def __deepcopy__(self, memo):
-        import copy as _copy
-        cls = self.__class__
-        result = cls.__new__(cls)
-        memo[id(self)] = result
-        for k, v in self.__dict__.items():
-            if k == "ui":
-                setattr(result, k, None)
-            else:
-                setattr(result, k, _copy.deepcopy(v, memo))
-        return result
+        return _safe_deepcopy(self, memo, lambda: None)
 
     def _notify(self, msg: str):
         if self.ui is not None:
@@ -204,17 +222,8 @@ class Player:
         self.ai_strategy = ai_strategy
 
     def __deepcopy__(self, memo):
-        import copy as _copy
         from .ui import NullUI
-        cls = self.__class__
-        result = cls.__new__(cls)
-        memo[id(self)] = result
-        for k, v in self.__dict__.items():
-            if k == "ui":
-                setattr(result, k, NullUI())
-            else:
-                setattr(result, k, _copy.deepcopy(v, memo))
-        return result
+        return _safe_deepcopy(self, memo, NullUI)
 
     def draw_cards(self, cards: List[Card]):
         self.hand.extend(cards)
@@ -573,19 +582,8 @@ class UNOGame:
         self.achievements.add_achievements(mod_achievements)
 
     def __deepcopy__(self, memo):
-        import copy as _copy
         from .ui import NullUI
-        cls = self.__class__
-        result = cls.__new__(cls)
-        memo[id(self)] = result
-        for k, v in self.__dict__.items():
-            if k == "ui":
-                setattr(result, k, NullUI())
-            elif k == "recorder":
-                setattr(result, k, None)
-            else:
-                setattr(result, k, _copy.deepcopy(v, memo))
-        return result
+        return _safe_deepcopy(self, memo, NullUI)
 
     def broadcast(self, message: str):
         seen_ids = set()

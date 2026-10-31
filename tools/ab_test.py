@@ -90,7 +90,7 @@ def play_one(mode, seed):
 
 def main():
     n = int(sys.argv[1]) if len(sys.argv) > 1 else 100
-    mode = sys.argv[2] if len(sys.argv) > 2 else "hs"
+    mode = sys.argv[2] if len(sys.argv) > 2 else "m3"
     if mode not in ("hs", "mh", "m3"):
         print(f"未知模式: {mode}，可选 hs / mh / m3")
         return 2

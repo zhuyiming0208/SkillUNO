@@ -4,7 +4,7 @@ from uno.replay import GameRecorder, GameReplayer
 from uno.ui import ConsoleUI
 from uno.paths import find_mods_dir
 
-VERSION = "v1.18.2"
+VERSION = "v1.18.3"
 
 def _make_ai(level: str):
     """按难度返回 AI 策略实例。level: '1'/'2'/'3'。"""
@@ -18,16 +18,69 @@ def _make_ai(level: str):
     return HeuristicAI()
 
 
+def _ask_hotseat_count():
+    """循环问热座人数，直到 2-4。"""
+    while True:
+        raw = input("请输入热座人数（2~4）: ").strip()
+        try:
+            n = int(raw)
+        except ValueError:
+            print("请输入数字")
+            continue
+        if 2 <= n <= 4:
+            return n
+        print(f"人数必须在 2~4 之间，你输入了 {n}")
+
+
+def _collect_hotseat_players(initial_name, count):
+    """收集热座玩家名字。@ 复用 initial_name，重名报错重问。"""
+    players = []
+    for i in range(count):
+        while True:
+            hint = f"请输入玩家 {i + 1} 名字"
+            if initial_name not in players:
+                hint += f"（输入 @ 使用 '{initial_name}'）"
+            name = input(f"{hint}: ").strip()
+            if name == '@':
+                name = initial_name
+            if not name:
+                print("名字不能为空")
+                continue
+            if name in players:
+                print(f"名字 '{name}' 已被使用，请重新输入")
+                continue
+            players.append(name)
+            break
+    return players
+
+
 def main():
     print(f"欢迎来到 SkillUNO {VERSION}！")
 
     # --- 玩家身份 ---
-    player_name = input("请输入你的名字（直接回车默认'你'）: ").strip()
-    if not player_name:
-        player_name = "你"
+    initial_name = input("请输入你的名字（直接回车默认'你'）: ").strip()
+    if not initial_name:
+        initial_name = "你"
 
-    show_record(player_name)
-    print(f"\n你好，{player_name}！")
+    # --- 游戏模式选择 ---
+    print("\n请选择游戏模式：")
+    print("  1. 单人模式（你 vs 3 个电脑）")
+    print("  2. 热座模式（2~4 人同屏轮流操作）")
+    mode_choice = input("请输入编号（默认 1）: ").strip()
+    hotseat = (mode_choice == '2')
+
+    if hotseat:
+        count = _ask_hotseat_count()
+        players = _collect_hotseat_players(initial_name, count)
+        print(f"\n热座模式玩家：{', '.join(players)}")
+        player_name = players[0]
+        ai_strategy = None
+    else:
+        player_name = initial_name
+        show_record(player_name)
+        print(f"\n你好，{player_name}！")
+        players = None
+        ai_strategy = None
 
     # --- 赛季选择 ---
     print("\n可用赛季：")
@@ -52,20 +105,21 @@ def main():
         print("未选择任何赛季，默认启用 S1。")
         enabled_seasons = ['S1']
 
-    # --- AI 难度选择 ---
-    print()
-    print("请选择 AI 难度：")
-    print("  1. 简单 (无脑出牌，适合新手)")
-    print("  2. 普通 (会算计、卡下家，推荐)")
-    print("  3. 地狱 (MCTS 神级算法，极强！)")
-    diff_choice = input("请输入编号（默认 2）: ").strip()
-    if diff_choice == '3':
-        print("\033[91m⚠️ 警告：地狱难度 AI 会进行深度推演，每回合可能会思考 1~2 秒，请耐心等待。\033[0m")
-        ai_strategy = _make_ai('3')
-    elif diff_choice == '1':
-        ai_strategy = _make_ai('1')
-    else:
-        ai_strategy = _make_ai('2')
+    # --- AI 难度选择（仅单人模式）---
+    if not hotseat:
+        print()
+        print("请选择 AI 难度：")
+        print("  1. 简单 (无脑出牌，适合新手)")
+        print("  2. 普通 (会算计、卡下家，推荐)")
+        print("  3. 地狱 (MCTS 神级算法，极强！)")
+        diff_choice = input("请输入编号（默认 2）: ").strip()
+        if diff_choice == '3':
+            print("\033[91m⚠️ 警告：地狱难度 AI 会进行深度推演，每回合可能会思考 1~2 秒，请耐心等待。\033[0m")
+            ai_strategy = _make_ai('3')
+        elif diff_choice == '1':
+            ai_strategy = _make_ai('1')
+        else:
+            ai_strategy = _make_ai('2')
 
     # --- 调试模式 ---
     debug_choice = input("是否开启调试模式？(0关闭, 1开启，默认0): ").strip()
@@ -84,16 +138,6 @@ def main():
         print("未安装 rich 库，将使用普通界面。安装命令：pip install rich")
         use_rich = False
 
-    # --- 开发工具（可注释掉） ---
-    # from uno.season1 import PoWanFa, QiaoWu, ChuNeng
-    # dev = {
-    #     player_name: [PoWanFa, QiaoWu, ChuNeng],
-    # }
-    # game = UNOGame(player_name, enabled_seasons, debug=debug,
-    #                dev_skills=dev, use_rich_ui=use_rich)
-    # game.run()
-    # return
-
     # --- 录制选项 ---
     recorder = None
     rec_choice = input("是否录制本局游戏？(y/n, 默认n): ").strip().lower()
@@ -101,14 +145,24 @@ def main():
         recorder = GameRecorder()
 
     # --- 开始游戏 ---
-    game = UNOGame(
-        player_name,
-        enabled_seasons,
-        debug=debug,
-        use_rich_ui=use_rich,
-        recorder=recorder,
-        ai_strategy=ai_strategy,
-    )
+    if hotseat:
+        game = UNOGame(
+            player_name,
+            enabled_seasons,
+            debug=debug,
+            use_rich_ui=use_rich,
+            recorder=recorder,
+            players=players,
+        )
+    else:
+        game = UNOGame(
+            player_name,
+            enabled_seasons,
+            debug=debug,
+            use_rich_ui=use_rich,
+            recorder=recorder,
+            ai_strategy=ai_strategy,
+        )
     game.run()
 
 

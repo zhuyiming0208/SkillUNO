@@ -888,3 +888,109 @@ a:not(.mod-card):not(.collection-card):not(.mod-in-collection):not(.back-link):n
         margin-bottom: 0;
     }
 }
+
+/* ========== 技能图鉴（skills 页） ========== */
+.skill-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+}
+
+@media (max-width: 1024px) {
+    .skill-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 640px) {
+    .skill-grid { grid-template-columns: 1fr; gap: 12px; }
+}
+
+.skill-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--cyan);
+    padding: 1rem 1.1rem;
+    transition: all 0.15s ease;
+}
+
+.skill-card:hover {
+    border-color: var(--border-hi);
+    box-shadow: 0 0 8px rgba(0, 217, 255, 0.3);
+}
+
+.skill-card-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.skill-name {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: var(--cyan);
+    word-break: break-word;
+}
+
+.skill-badge {
+    font-size: 0.7rem;
+    padding: 2px 8px;
+    border-radius: 8px;
+    border: 1px solid;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.badge-active {
+    color: var(--cyan);
+    border-color: var(--cyan);
+    background: rgba(0, 217, 255, 0.1);
+}
+
+.badge-passive {
+    color: var(--fg-dim);
+    border-color: var(--fg-dim);
+    background: rgba(139, 148, 158, 0.1);
+}
+
+.badge-death {
+    color: var(--red);
+    border-color: var(--red);
+    background: rgba(248, 81, 73, 0.1);
+}
+
+.badge-hybrid {
+    color: var(--magenta);
+    border-color: var(--magenta);
+    background: rgba(255, 0, 255, 0.1);
+}
+
+.skill-desc {
+    font-size: 0.88rem;
+    color: var(--fg);
+    line-height: 1.5;
+    margin-bottom: 0.5rem;
+}
+
+.skill-help {
+    font-size: 0.78rem;
+    color: var(--fg-dim);
+    line-height: 1.5;
+    margin-bottom: 0.6rem;
+    padding-left: 0.6rem;
+    border-left: 2px solid var(--border);
+}
+
+.skill-meta {
+    font-size: 0.72rem;
+    color: var(--fg-dim);
+    text-align: right;
+    margin-top: 0.4rem;
+}
+
+/* ========== 首页站点导航（技能图鉴入口） ========== */
+.site-nav {
+    margin-top: 1rem;
+    display: flex;
+    gap: 1.5rem;
+}

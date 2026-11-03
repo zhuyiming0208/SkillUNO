@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>技能图鉴 · SkillUNO</title>
+    <meta name="description" content="SkillUNO 技能图鉴 —— 浏览所有赛季与模组的技能">
+    <meta name="theme-color" content="#0d1117">
+    <link rel="icon" type="image/svg+xml" href="../favicon.svg">
+    <link rel="stylesheet" href="../assets/css/main.css">
+</head>
+<body>
+    <header class="list-header">
+        <div class="list-header-row">
+            <a href="../index.html" class="back-link">← 返回首页</a>
+            <h1 class="list-title">技能图鉴</h1>
+            <div class="search-wrapper">
+                <input type="text" id="search-box" class="search-box"
+                       placeholder="搜索技能名、描述..." autocomplete="off">
+                <button type="button" id="clear-btn" class="clear-btn" hidden>×</button>
+            </div>
+        </div>
+    </header>
+
+    <main class="list-layout">
+        <aside id="season-bar" class="tag-bar" aria-label="按赛季筛选">
+            <p class="tag-bar-title">赛季</p>
+            <div id="season-list" class="tag-list">
+                <button type="button" class="tag-btn tag-all active" data-season="">全部</button>
+            </div>
+        </aside>
+        <div id="skill-grid" class="skill-grid">
+            <p class="loading">加载中...</p>
+        </div>
+    </main>
+
+    <footer class="site-footer">
+        <p id="count-display" class="footer-note">共 0 个技能</p>
+        <p class="footer-note">
+            SkillUNO 技能图鉴 ·
+            <a href="https://github.com/zhuyiming0208/SkillUNO">GitHub</a>
+        </p>
+    </footer>
+
+    <script src="../assets/js/search.js"></script>
+    <script>
+    (async function init() {
+        const grid = document.getElementById('skill-grid');
+        const searchBox = document.getElementById('search-box');
+        const clearBtn = document.getElementById('clear-btn');
+        const countDisplay = document.getElementById('count-display');
+        const seasonList = document.getElementById('season-list');
+
+        let allSkills = [];
+        let selectedSeason = '';
+
+        try {
+            const res = await fetch('./skills.json?v=' + Date.now());
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            const data = await res.json();
+            allSkills = data.skills || [];
+        } catch (err) {
+            console.error(err);
+            grid.innerHTML = '<p class="error">无法加载技能数据</p>';
+            return;
+        }
+
+        function escapeHtml(s) {
+            return String(s || '').replace(/[&<>"']/g, c =>
+                ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);
+        }
+
+        const TYPE_CLASS = {
+            '主动': 'badge-active',
+            '被动': 'badge-passive',
+            '亡语': 'badge-death',
+            '混合': 'badge-hybrid',
+        };
+
+        function renderCard(s) {
+            const cls = TYPE_CLASS[s.type] || 'badge-active';
+            return `<div class="skill-card">
+                <div class="skill-card-head">
+                    <span class="skill-name">${escapeHtml(s.name)}</span>
+                    <span class="skill-badge ${cls}">${escapeHtml(s.type)}</span>
+                </div>
+                <p class="skill-desc">${escapeHtml(s.description)}</p>
+                ${s.help ? `<p class="skill-help">${escapeHtml(s.help)}</p>` : ''}
+                <p class="skill-meta">${escapeHtml(s.season_id)} · ${escapeHtml(s.season_name)}</p>
+            </div>`;
+        }
+
+        function renderSeasons() {
+            const seen = new Map();
+            for (const s of allSkills) {
+                if (s.season_id && !seen.has(s.season_id)) {
+                    seen.set(s.season_id, s.season_name || s.season_id);
+                }
+            }
+            for (const [sid, sname] of seen) {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'tag-btn';
+                btn.dataset.season = sid;
+                btn.textContent = sname;
+                seasonList.appendChild(btn);
+            }
+        }
+
+        function syncSeasonActive() {
+            seasonList.querySelectorAll('.tag-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.season === selectedSeason);
+            });
+        }
+
+        function apply() {
+            const kw = (searchBox.value || '').trim().toLowerCase();
+            let list = allSkills;
+            if (selectedSeason) {
+                list = list.filter(s => s.season_id === selectedSeason);
+            }
+            if (kw) {
+                list = list.filter(s =>
+                    [s.name, s.description, s.help, s.season_name]
+                        .some(f => f && String(f).toLowerCase().includes(kw)));
+            }
+            if (list.length === 0) {
+                grid.innerHTML = '<p class="empty">未找到匹配的技能</p>';
+            } else {
+                grid.innerHTML = list.map(renderCard).join('');
+            }
+            countDisplay.textContent = `共 ${list.length} 个技能`;
+        }
+
+        renderSeasons();
+        apply();
+
+        const debouncedApply = debounce(apply, 200);
+        searchBox.addEventListener('input', (e) => {
+            clearBtn.hidden = !e.target.value;
+            debouncedApply();
+        });
+        clearBtn.addEventListener('click', () => {
+            searchBox.value = '';
+            clearBtn.hidden = true;
+            apply();
+            searchBox.focus();
+        });
+        searchBox.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') e.preventDefault();
+        });
+        seasonList.addEventListener('click', (e) => {
+            const btn = e.target.closest('.tag-btn');
+            if (!btn) return;
+            selectedSeason = btn.dataset.season || '';
+            syncSeasonActive();
+            apply();
+        });
+    })();
+    </script>
+</body>
+</html>

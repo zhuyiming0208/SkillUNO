@@ -4,7 +4,7 @@ from uno.replay import GameRecorder, GameReplayer
 from uno.ui import ConsoleUI
 from uno.paths import find_mods_dir
 
-VERSION = "v1.19.2"
+VERSION = "v1.20.0"
 
 def _make_ai(level: str):
     """按难度返回 AI 策略实例。level: '1'/'2'/'3'。"""
@@ -226,6 +226,11 @@ def cli_entry():
         from uno.paths import find_mods_dir
         mods_dir = find_mods_dir()
         sys.exit(run_cli(argv[1:], mods_dir=str(mods_dir)))
+    elif argv and argv[0] == 'tui':
+        from uno.ui.textual_ui import run_tui
+        result = run_tui()
+        if result == 'new':
+            main()
     else:
         cli()
 

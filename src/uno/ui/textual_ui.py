@@ -1,14 +1,9 @@
-"""Textual 全屏 TUI（阶段 1：仅主菜单）。
-
-设计：
-- 阶段 1 只实现 MenuScreen，点「新游戏」后返回 "new"，由 main.py 降级到 ConsoleUI 跑游戏。
-- 不碰 core.py，不涉及跨线程，零风险。
-- 未安装 textual 时，run_tui() 打印提示并返回 None，调用方降级。
-"""
+"""Textual 全屏 TUI（阶段 1：仅主菜单）。"""
 try:
     from textual.app import App, ComposeResult
-    from textual.widgets import Button, Static, Header, Footer
+    from textual.widgets import Button, Static
     from textual.screen import Screen
+    from textual.containers import Center, Vertical
     TEXTUAL_AVAILABLE = True
 except ImportError:
     TEXTUAL_AVAILABLE = False
@@ -16,16 +11,20 @@ except ImportError:
 
 if TEXTUAL_AVAILABLE:
 
+
+
     class MenuScreen(Screen):
         """主菜单：新游戏 / 退出。"""
 
         def compose(self) -> ComposeResult:
-            yield Header()
-            yield Static("SkillUNO", id="title")
-            yield Static("选择操作", id="subtitle")
-            yield Button("新游戏", id="new", variant="primary")
-            yield Button("退出", id="quit", variant="error")
-            yield Footer()
+            with Vertical(id="menu-card"):
+                yield Static("S K I L L U N O", id="title")
+                yield Static("进阶 UNO · 全屏终端版", id="subtitle")
+                with Center():
+                    yield Button("新  游  戏", id="new", variant="primary")
+                with Center():
+                    yield Button("退      出", id="quit", variant="error")
+                yield Static("↑↓ 选择 · Enter 确认 · 或直接鼠标点击", id="hint")
 
         def on_button_pressed(self, event: Button.Pressed) -> None:
             if event.button.id == "new":
@@ -34,30 +33,83 @@ if TEXTUAL_AVAILABLE:
                 self.app.exit(result="quit")
 
     class SkillUNOApp(App):
-        """TUI 主应用。run() 返回值即用户选择。"""
+        """TUI 主应用。"""
 
         CSS = """
-        MenuScreen {
-            align-horizontal: center;
+        Screen {
+            background: #0d1117;
+            align: center middle;
+        }
+        #menu-card {
+            width: 90%;
+            max-width: 80;
+            height: auto;
+            min-height: 24;
+            padding: 3 6;
+            background: #161b22;
+            border: round #00d9ff;
         }
         #title {
             text-align: center;
             text-style: bold;
-            color: cyan;
-            height: 3;
+            color: #00d9ff;
             width: 100%;
-            margin-top: 2;
+            margin-top: 1;
+            margin-bottom: 2;
         }
         #subtitle {
             text-align: center;
-            color: grey;
-            height: 1;
+            color: #ff00ff;
             width: 100%;
-            margin-bottom: 1;
+            margin-bottom: 3;
+            text-style: bold;
+        }
+        #divider, #divider-bottom {
+            text-align: center;
+            color: #30363d;
+            width: 100%;
+        }
+        #divider {
+            margin-bottom: 2;
+        }
+        #divider-bottom {
+            margin-top: 2;
+            margin-bottom: 2;
         }
         Button {
-            width: 40;
-            margin: 1 0;
+            width: 100%;
+            height: 3;
+            margin-bottom: 2;
+            border: none;
+            content-align: center middle;
+        }
+        Button:focus {
+            border: none;
+        }
+        Button#new {
+            background: #00d9ff;
+            color: #0d1117;
+            text-style: bold;
+        }
+        Button#new:hover {
+            background: #ff00ff;
+            color: #ffffff;
+        }
+        Button#quit {
+            background: #f85149;
+            color: #ffffff;
+            text-style: bold;
+        }
+        Button#quit:hover {
+            background: #ff00ff;
+            color: #ffffff;
+        }
+        #hint {
+            text-align: center;
+            color: #8b949e;
+            width: 100%;
+            margin-top: 2;
+            text-style: italic;
         }
         """
 
@@ -66,13 +118,7 @@ if TEXTUAL_AVAILABLE:
 
 
 def run_tui():
-    """启动 TUI 菜单。
-
-    返回：
-      "new"  —— 用户选择新游戏（调用方降级到 ConsoleUI 跑游戏）
-      "quit" —— 用户选择退出
-      None   —— textual 未安装
-    """
+    """启动 TUI 菜单。"""
     if not TEXTUAL_AVAILABLE:
         print("未安装 textual，无法启动全屏 TUI。")
         print("请运行：pip install 'skilluno[tui]'")

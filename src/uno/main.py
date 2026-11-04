@@ -4,7 +4,7 @@ from uno.replay import GameRecorder, GameReplayer
 from uno.ui import ConsoleUI
 from uno.paths import find_mods_dir
 
-VERSION = "v1.18.3"
+VERSION = "v1.19.0"
 
 def _make_ai(level: str):
     """按难度返回 AI 策略实例。level: '1'/'2'/'3'。"""
@@ -196,6 +196,7 @@ def cli():
             "2. 回放录像\n"
             "3. 统计面板\n"
             "4. 模组商店\n"
+            "5. 新手引导\n"
             "0. 退出\n"
             "请选择: "
         ).strip()
@@ -210,6 +211,9 @@ def cli():
             stats_panel()
         elif action == '4':
             mod_store()
+        elif action == '5':
+            from uno.tutorial import run_tutorial
+            run_tutorial()
         # 其他输入 → 回到菜单
 
 

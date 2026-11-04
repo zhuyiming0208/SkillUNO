@@ -40,7 +40,9 @@ jobs:
       - name: Export skills to web
         env:
           PYTHONPATH: src
-        run: python tools/export_skills.py
+        run: |
+          pip install -e .
+          python tools/export_skills.py
 
       - uses: actions/configure-pages@v4
 

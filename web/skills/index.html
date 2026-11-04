@@ -132,6 +132,12 @@
             countDisplay.textContent = `共 ${list.length} 个技能`;
         }
 
+        if (allSkills.length === 0) {
+            grid.innerHTML = '<p class="error">技能数据为空，请联系维护者</p>';
+            countDisplay.textContent = '';
+            return;
+        }
+
         renderSeasons();
         apply();
 

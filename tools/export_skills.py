@@ -41,8 +41,9 @@ def _extract_season(module_name, display_id, display_name):
     try:
         module = importlib.import_module(f"uno.{module_name}")
     except ImportError as e:
-        print(f"[跳过] {module_name}: {e}", file=sys.stderr)
-        return []
+        print(f"[错误] 无法导入官方赛季 {module_name}: {e}", file=sys.stderr)
+        print("       这通常意味着环境依赖缺失（如 rich）。", file=sys.stderr)
+        raise
 
     season_id = getattr(module, "SEASON_ID", display_id)
     season_name = getattr(module, "SEASON_NAME", display_name)
@@ -80,7 +81,8 @@ def _extract_local_mods():
         try:
             module = importlib.import_module(f"mods.{mod_name}")
         except ImportError as e:
-            print(f"[跳过 mod] {mod_name}: {e}", file=sys.stderr)
+            print(f"[警告] mod {mod_name} 导入失败（不影响官方赛季）: {e}",
+                  file=sys.stderr)
             continue
 
         season_id = getattr(module, "SEASON_ID", mod_name.upper())
@@ -123,6 +125,10 @@ def main():
     all_skills.extend(mod_skills)
     if mod_skills:
         print(f"  Mods: {len(mod_skills)} 个技能")
+
+    if len(all_skills) == 0:
+        print("[错误] 导出 0 个技能，环境依赖可能缺失", file=sys.stderr)
+        sys.exit(1)
 
     OUT.parent.mkdir(parents=True, exist_ok=True)
     payload = {

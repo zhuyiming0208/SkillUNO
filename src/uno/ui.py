@@ -1,5 +1,12 @@
 import os
-from rich.console import Console as RichConsole
+
+try:
+    from rich.console import Console as RichConsole
+    RICH_AVAILABLE = True
+except ImportError:
+    RichConsole = None
+    RICH_AVAILABLE = False
+
 
 class ConsoleUI:
     """默认命令行 UI，用于解耦输入输出"""
@@ -44,8 +51,12 @@ class NullUI(ConsoleUI):
 
 
 class RichUI(ConsoleUI):
-    """彩色 UI"""
+    """彩色 UI（需要 rich 依赖）"""
     def __init__(self):
+        if not RICH_AVAILABLE:
+            raise RuntimeError(
+                "rich 未安装，无法使用彩色界面。"
+                "请运行 pip install rich 或 pip install 'skilluno[rich]'")
         self.console = RichConsole()
 
     def show(self, text=""):

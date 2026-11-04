@@ -1,13 +1,14 @@
 [project]
 name = "skilluno"
-version = "1.19.1"
+version = "1.19.2"
 description = "一个基于 Python 的 UNO 卡牌游戏框架"
 readme = "README.md"
 requires-python = ">=3.8"
 license = "MIT"
-dependencies = [
-    "rich>=13.0",
-]
+dependencies = []
+
+[project.optional-dependencies]
+rich = ["rich>=13.0"]
 
 [project.scripts]
 skilluno = "uno.main:cli_entry"

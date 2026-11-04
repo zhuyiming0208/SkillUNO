@@ -61,6 +61,8 @@ pip install skilluno
 skilluno
 ```
 
+**彩色界面（可选）**：`pip install skilluno[rich]` 安装 `rich` 依赖。未安装时自动降级为纯文本界面。
+
 ### 方式二：可编辑安装
 ```bash
 git clone https://github.com/zhuyiming0208/SkillUNO.git

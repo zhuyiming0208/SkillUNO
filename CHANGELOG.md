@@ -9,6 +9,20 @@
 
 ---
 
+## [v1.19.2] - 2026-11-04
+
+修复技能图鉴空列表，rich 改为可选依赖
+
+deploy-web.yml 增加 pip install -e .，确保 CI 有依赖
+export_skills.py 官方赛季导入失败时 raise，不再静默返回空
+export_skills.py 导出 0 技能时 sys.exit(1)
+index.html 区分数据为空与加载失败
+ui.py rich 改为可选 import，UNOGame 自动降级 ConsoleUI
+pyproject.toml rich 移至 optional-dependencies
+README 补充 pip install skilluno[rich] 说明
+
+---
+
 ## [v1.19.1] - 2026-11-04
 
 修复 v1.19.0 发布挂起问题

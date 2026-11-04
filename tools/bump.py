@@ -81,8 +81,15 @@ def insert_new_entry(path, ver, date, subject, details, dry_run=False):
 
     body = _strip_commit_prefix(subject)
     if details:
-        details_text = details.replace('\\n', '\n')
-        body += f"\n\n{details_text}"
+        details_text = details.replace('\\n', chr(10))
+        fixed_lines = []
+        for ln in details_text.splitlines():
+            stripped = ln.lstrip()
+            if stripped and not stripped.startswith('- '):
+                fixed_lines.append('- ' + ln)
+            else:
+                fixed_lines.append(ln)
+        body += chr(10)*2 + chr(10).join(fixed_lines)
 
     entry = f"## [v{ver}] - {date}\n\n{body}\n\n---\n\n"
 

@@ -9,6 +9,11 @@ SRC_DIR = os.path.join(PROJECT_ROOT, "src")
 if SRC_DIR not in sys.path:
     sys.path.insert(0, SRC_DIR)
 
+import pytest
+
+# 如果未安装 textual（CI 或精简环境），整个文件跳过，防止 collection error
+textual = pytest.importorskip("textual")
+
 from uno.ui.textual_ui import TEXTUAL_AVAILABLE
 
 

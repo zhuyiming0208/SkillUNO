@@ -39,19 +39,31 @@ def test_menu_screen_renders_two_buttons():
     assert asyncio.run(_run()) == 2
 
 
-def test_click_new_returns_new():
-    from uno.ui.textual_ui import SkillUNOApp
+def test_click_new_goes_to_game_screen(monkeypatch):
+    from uno.ui.textual_ui import SkillUNOApp, GameScreen
 
     async def _run():
         app = SkillUNOApp()
+        pushed_screens = []
+        orig_push = app.push_screen
+        def _fake_push(screen, **kwargs):
+            # 防止测试环境真启动后台游戏线程导致死锁
+            if isinstance(screen, GameScreen):
+                screen.test_mode = True
+            pushed_screens.append(screen)
+            orig_push(screen, **kwargs)
+        monkeypatch.setattr(app, "push_screen", _fake_push)
+
         async with app.run_test() as pilot:
             await pilot.pause()
             await pilot.click("#new")
             await pilot.pause()
-            return app.return_value
+            return pushed_screens
 
-    assert asyncio.run(_run()) == "new"
-
+    screens = asyncio.run(_run())
+    # on_mount 里 push 了 MenuScreen，点击又 push 了 GameScreen
+    assert len(screens) >= 1
+    assert isinstance(screens[-1], GameScreen)
 
 def test_click_quit_returns_quit():
     from uno.ui.textual_ui import SkillUNOApp

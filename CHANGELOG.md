@@ -9,6 +9,19 @@
 
 ---
 
+## [v1.21.0] - 2026-11-07
+
+Textual 阶段 2 - 全屏 GameScreen 与单向通信
+
+- 新增全屏 GameScreen，日志实时滚动展示
+- 实现基于 threading.Event 的跨线程安全输入桥接
+- Header 动态显示当前回合玩家
+- 赛季输入增加白名单校验，非法输入红字提示
+- SystemExit 兜底，q 退出时优雅回主菜单
+- 去掉 Header 默认 icon 与 Footer palette 提示
+
+---
+
 ## [v1.20.1] - 2026-11-04
 
 优化 TUI 菜单布局与视觉比例

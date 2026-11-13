@@ -24,3 +24,15 @@ class DrawCardAction:
 class QuitGameAction:
     """玩家选择退出当前对局。"""
     pass
+
+
+@dataclass
+class ActivateSkillAction:
+    """玩家选择发动某个主动技能。skill_index 是在 available_active_skills 里的索引。"""
+    skill_index: int
+
+
+@dataclass
+class HelpAction:
+    """玩家点击帮助按钮。"""
+    pass

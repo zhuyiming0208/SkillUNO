@@ -272,19 +272,54 @@ class Player:
                     combos.append((combo_id, s.combo_effect))
         return [(f"组合技:{'/'.join(cid)}", ce) for cid, ce in combos]
 
+    HELP_TEXT = """
+=== UNO 帮助 ===
+- 输入序号出牌，例如输入 3 打出第 4 张手牌。
+- 直接回车抽一张牌。
+- 抽到的牌如果可以出，会询问你是否立刻打出 (y/n)。
+- 输入 s 选择并发动主动技能。
+- 输入 help 技能名 查看该技能的详细说明。
+- 万能牌打出时需选择颜色（0红 1蓝 2绿 3黄）。
+- 手牌数量达到上限将立即淘汰。
+=================
+"""
+
+    def available_active_skills(self):
+        """当前回合可发动的主动技能列表（含混合型）。"""
+        return [s for s in self.skills
+                if not s.is_consumed and not s.is_deleted
+                and s.type in (SkillType.ACTIVE, SkillType.HYBRID)
+                and s.can_trigger(GameEvent.TURN_START, {'player': self})]
+
     def choose_play(self, top_card: Card, current_color: str, game: 'UNOGame') -> Optional[int]:
         self.game = game
         if self.is_human:
-            action = self.ui.choose_action(self, game, top_card, current_color)
-            if action is not None:
-                from .ui.actions import PlayCardAction, DrawCardAction, QuitGameAction
+            from .ui.actions import (
+                PlayCardAction, DrawCardAction, QuitGameAction,
+                ActivateSkillAction, HelpAction,
+            )
+            while True:
+                action = self.ui.choose_action(self, game, top_card, current_color)
+                if action is None:
+                    return self.human_choose(top_card, current_color)
                 if isinstance(action, PlayCardAction):
                     return action.card_index
                 if isinstance(action, DrawCardAction):
                     return None
                 if isinstance(action, QuitGameAction):
                     raise SystemExit
-            return self.human_choose(top_card, current_color)
+                if isinstance(action, HelpAction):
+                    self.ui.show(self.HELP_TEXT)
+                    continue
+                if isinstance(action, ActivateSkillAction):
+                    usable = self.available_active_skills()
+                    if 0 <= action.skill_index < len(usable):
+                        skill = usable[action.skill_index]
+                        self.game.skill_manager.execute_skill(
+                            skill, GameEvent.TURN_START, {'player': self})
+                    continue
+                # 未知 Action，回退到旧流程
+                return self.human_choose(top_card, current_color)
         else:
             return self.ai_choose(top_card, current_color)
 

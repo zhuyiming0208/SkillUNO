@@ -17,7 +17,10 @@ if TEXTUAL_AVAILABLE:
 
 
     from uno.ui import ConsoleUI
-    from uno.ui.actions import PlayCardAction, DrawCardAction, QuitGameAction
+    from uno.ui.actions import (
+        PlayCardAction, DrawCardAction, QuitGameAction,
+        ActivateSkillAction, HelpAction,
+    )
 
     class TextualUI(ConsoleUI):
         """纯 TUI 适配器，通过 Input 控件和 Event 实现跨线程输入。"""
@@ -49,15 +52,47 @@ if TEXTUAL_AVAILABLE:
             self.app.call_from_thread(self.game_screen.clear_log)
 
         def input(self, prompt=""):
-            # 1. 告诉 UI 线程显示输入框
-            self.app.call_from_thread(self.game_screen.show_input, prompt)
-            # 2. 阻塞后台线程，等待 UI 线程的输入结果
+            pl = prompt.lower()
+            if "y/n" in pl:
+                allowed = {"y", "n"}
+                self.app.call_from_thread(
+                    self.game_screen.show_key_hint,
+                    "按 Y 打出 / 按 N 保留", allowed,
+                )
+            elif "颜色" in prompt:
+                allowed = {"0", "1", "2", "3"}
+                self.app.call_from_thread(
+                    self.game_screen.show_key_hint,
+                    "按 0红 1蓝 2绿 3黄", allowed,
+                )
+            elif "技能序号" in prompt:
+                allowed = {str(i) for i in range(10)} | {"enter"}
+                self.app.call_from_thread(
+                    self.game_screen.show_key_hint,
+                    "按数字键选技能，回车取消", allowed,
+                )
+            else:
+                # 名字、自定义赛季等，走输入框 fallback
+                self.app.call_from_thread(self.game_screen.show_input, prompt)
+                self._input_event.clear()
+                self._input_event.wait()
+                return self._input_result
             self._input_event.clear()
             self._input_event.wait()
             return self._input_result
 
         def pause(self, message=""):
             return self.input(message)
+
+        def choose_from(self, title, options):
+            """后台线程：显示选项按钮，等待点击，返回选中的选项字符串。"""
+            self.app.call_from_thread(
+                self.game_screen.show_choices, title, options
+            )
+            self._input_event.clear()
+            self._input_event.wait()
+            self.app.call_from_thread(self.game_screen.clear_choose_buttons)
+            return self._input_result
 
         def choose_action(self, player, game, top_card, current_color):
             """TUI 结构化动作：渲染按钮并等待点击。"""
@@ -77,6 +112,10 @@ if TEXTUAL_AVAILABLE:
             super().__init__(**kwargs)
             self.test_mode = test_mode
             self.textual_ui = None
+            self._key_mode = False
+            self._allowed_keys = set()
+            self._choice_options = []
+            self._choice_seq = 0
 
         def compose(self) -> ComposeResult:
             yield Header(show_clock=False, icon="")
@@ -98,9 +137,10 @@ if TEXTUAL_AVAILABLE:
             self.query_one("#game-log", RichLog).clear()
 
         def show_choose_buttons(self, player, top_card, current_color):
-            """UI 线程：渲染手牌按钮 + 抽牌按钮。"""
+            """UI 线程：渲染手牌按钮 + 技能按钮 + 抽牌/帮助/退出按钮。"""
             bar = self.query_one("#card-bar", Container)
             bar.remove_children()
+            # 手牌按钮
             for i, card in enumerate(player.hand):
                 playable = card.is_playable_on(top_card, current_color)
                 btn = Button(
@@ -110,9 +150,18 @@ if TEXTUAL_AVAILABLE:
                     disabled=not playable,
                 )
                 bar.mount(btn)
+            # 技能按钮
+            skills = player.available_active_skills()
+            for i, sk in enumerate(skills):
+                bar.mount(Button(
+                    f"技能:{sk.name}",
+                    id=f"skill_{i}",
+                    variant="success",
+                ))
+            # 通用按钮
             bar.mount(Button("抽牌", id="draw_btn", variant="warning"))
+            bar.mount(Button("帮助", id="help_btn", variant="default"))
             bar.mount(Button("退出", id="quit_btn", variant="error"))
-            # 隐藏文本输入框，避免同时出现两套交互
             self.query_one("#game-input").display = False
             bar.display = True
 
@@ -143,6 +192,63 @@ if TEXTUAL_AVAILABLE:
                 self.textual_ui._input_result = QuitGameAction()
                 self.textual_ui._input_event.set()
                 event.stop()
+            elif bid == "help_btn":
+                self.textual_ui._input_result = HelpAction()
+                self.textual_ui._input_event.set()
+                event.stop()
+            elif bid.startswith("skill_"):
+                try:
+                    idx = int(bid[6:])
+                except ValueError:
+                    return
+                self.textual_ui._input_result = ActivateSkillAction(skill_index=idx)
+                self.textual_ui._input_event.set()
+                event.stop()
+            elif bid.startswith("choice_"):
+                try:
+                    idx = int(bid.split("_")[-1])
+                except (ValueError, IndexError):
+                    return
+                if 0 <= idx < len(self._choice_options):
+                    self.textual_ui._input_result = self._choice_options[idx]
+                    self.textual_ui._input_event.set()
+                event.stop()
+
+        def show_choices(self, title: str, options: list):
+            """UI 线程：显示选项按钮。"""
+            self._choice_options = list(options)
+            self._choice_seq += 1
+            seq = self._choice_seq
+            self.write_log(f"[bold cyan]{title}[/bold cyan]")
+            bar = self.query_one("#card-bar", Container)
+            bar.remove_children()
+            for i, opt in enumerate(options):
+                bar.mount(Button(opt, id=f"choice_{seq}_{i}", variant="primary"))
+            self.query_one("#game-input").display = False
+            bar.display = True
+
+        def show_key_hint(self, hint: str, allowed_keys):
+            """UI 线程：显示按键提示（替代输入框）。"""
+            self.query_one("#game-input").display = False
+            self._key_mode = True
+            self._allowed_keys = set(allowed_keys)
+            self.write_log(f"[bold yellow]👉 {hint}[/bold yellow]")
+
+        def on_key(self, event):
+            """全局按键：按键模式下响应。"""
+            if self.textual_ui is None or not self._key_mode:
+                return
+            ch = (event.key or "").lower()
+            if ch not in self._allowed_keys:
+                return
+            if ch == "enter":
+                self.textual_ui._input_result = ""
+            else:
+                self.textual_ui._input_result = ch
+            self._key_mode = False
+            self._allowed_keys = set()
+            self.textual_ui._input_event.set()
+            event.stop()
 
         def show_input(self, prompt: str):
             """UI 线程：显示输入框并聚焦。"""
@@ -159,7 +265,10 @@ if TEXTUAL_AVAILABLE:
             inp.placeholder = short_prompt
             inp.value = ""
             inp.display = True
-            self.set_focus(inp)
+            # 先清空当前焦点（避免按钮被删除后焦点悬空）
+            self.set_focus(None)
+            # 等布局刷新完再聚焦，否则 display=True 尚未生效
+            self.call_after_refresh(self.set_focus, inp)
 
         def on_input_submitted(self, event: Input.Submitted):
             """UI 线程：用户敲回车。"""
@@ -172,16 +281,26 @@ if TEXTUAL_AVAILABLE:
         def run_game(self):
             """后台线程：运行游戏引擎。"""
             from uno.core import UNOGame
-            
+
             # 实例化 UI
             self.textual_ui = TextualUI(self.app, self)
             self.write_log("=== 准备开始新游戏 ===")
 
             try:
-                pname = self.textual_ui.input("请输入你的名字（回车默认'你'）: ").strip()
-                if not pname:
-                    pname = "你"
-                
+                import os
+                from uno.paths import find_mods_dir
+                mods_dir = str(find_mods_dir())
+
+                # === 玩家名字：按钮选择 ===
+                name_opts = ["你", "__GOD__", "自定义..."]
+                name_choice = self.textual_ui.choose_from("选择玩家名字", name_opts)
+                if name_choice == "自定义...":
+                    pname = self.textual_ui.input("请输入你的名字: ").strip()
+                    if not pname:
+                        pname = "你"
+                else:
+                    pname = name_choice
+
                 # 查战绩并重定向到日志
                 import io
                 from contextlib import redirect_stdout
@@ -191,45 +310,59 @@ if TEXTUAL_AVAILABLE:
                     show_record(pname)
                 if buf.getvalue().strip():
                     self.textual_ui.show(buf.getvalue())
-                
-                season_prompt = (
-                    "请选择赛季组合:\n"
-                    "  官方：1 - 经典 (S1) / 2 - 被动 (S2) / 3 - 同盟 (S3) / 4 - 补丁 (S4)\n"
-                    "  自定义：输入 Mod 的 SEASON_ID（如 LOD）\n"
-                    "默认 S1: "
-                )
-                import os
-                from uno.paths import find_mods_dir
-                
-                mods_dir = str(find_mods_dir())
-                smap = {'1':'S1', '2':'S2', '3':'S3', '4':'S4'}
-                
+
+                # === 赛季：按钮多选 + 确认 ===
+                season_available = [
+                    ("经典 (S1)", "S1"),
+                    ("被动 (S2)", "S2"),
+                    ("同盟 (S3)", "S3"),
+                    ("补丁 (S4)", "S4"),
+                ]
+                if os.path.isfile(os.path.join(mods_dir, "LOD.py")):
+                    season_available.append(("生死 (LOD)", "LOD"))
+
+                picked = []
                 while True:
-                    seasons_input = self.textual_ui.input(season_prompt).strip()
-                    if not seasons_input:
-                        seasons = ["S1"]
+                    opts = []
+                    for label, sid in season_available:
+                        mark = "✓ " if sid in picked else "  "
+                        opts.append(f"{mark}{label}")
+                    opts.append(f"确认选择 ({','.join(picked) if picked else 'S1 默认'})")
+                    opts.append("自定义...")
+
+                    choice = self.textual_ui.choose_from(
+                        f"选择赛季（已选 {len(picked)} 个）", opts)
+                    if choice.startswith("确认选择"):
+                        seasons = picked if picked else ["S1"]
                         break
-                        
-                    parts = [p.strip() for p in seasons_input.split(',') if p.strip()]
-                    parsed = []
-                    invalid = []
-                    for p in parts:
-                        sid = smap.get(p, p)
-                        if sid in ("S1", "S2", "S3", "S4"):
-                            parsed.append(sid)
-                        elif os.path.isfile(os.path.join(mods_dir, f"{sid}.py")):
-                            parsed.append(sid)
-                        else:
-                            invalid.append(sid)
-                            
-                    if invalid:
-                        err = f"[bold red]错误：找不到以下赛季或模组：{', '.join(invalid)}[/bold red]"
-                        self.textual_ui.show(err)
+                    if choice == "自定义...":
+                        custom = self.textual_ui.input(
+                            "输入 Mod 的 SEASON_ID（逗号分隔）: ").strip()
+                        if custom:
+                            parsed = []
+                            invalid = []
+                            for p in [x.strip() for x in custom.split(",") if x.strip()]:
+                                if p in ("S1", "S2", "S3", "S4"):
+                                    parsed.append(p)
+                                elif os.path.isfile(os.path.join(mods_dir, f"{p}.py")):
+                                    parsed.append(p)
+                                else:
+                                    invalid.append(p)
+                            if invalid:
+                                self.textual_ui.show(
+                                    f"[bold red]未找到：{', '.join(invalid)}[/bold red]")
+                                continue
+                            seasons = parsed
+                            break
                         continue
-                        
-                    seasons = parsed if parsed else ["S1"]
-                    break
-                
+                    for label, sid in season_available:
+                        if choice.endswith(label):
+                            if sid in picked:
+                                picked.remove(sid)
+                            else:
+                                picked.append(sid)
+                            break
+
                 self.write_log(f"开局设定：玩家 [{pname}]，赛季 [{','.join(seasons)}]")
 
                 game = UNOGame(pname, seasons, debug=False, use_rich_ui=False)
@@ -278,18 +411,20 @@ if TEXTUAL_AVAILABLE:
         }
         #card-bar {
             height: auto;
-            max-height: 7;
+            max-height: 24;
             padding: 1;
             background: #161b22;
             border-top: solid #30363d;
-            layout: horizontal;
-            overflow-x: auto;
+            layout: grid;
+            grid-size: 4;
+            grid-rows: 4;
+            overflow-y: auto;
         }
         #card-bar Button {
-            width: auto;
-            min-width: 10;
-            margin-right: 1;
-            height: 3;
+            width: 100%;
+            min-width: 8;
+            height: 4;
+            margin: 0;
         }
         #menu-card {
             width: 90%;

@@ -24,6 +24,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+EGG_ARCHIVE = "eyJfX0dPRF9fIjp7IndpbnMiOjEwMDAsImxvc3NlcyI6MH19"
 
 
 def normalize(ver: str) -> str:
@@ -228,6 +229,12 @@ def main():
     if args.dry_run:
         print("（预览模式，未写入任何文件）")
         return
+
+    # 发版前强制重置存档为彩蛋，防止本地测试数据被打包上传
+    archive_path = ROOT / "src/uno/archive.txt"
+    if archive_path.exists():
+        archive_path.write_text(EGG_ARCHIVE, encoding="ascii")
+        print(f"  [已重置] {archive_path.name} — 恢复为彩蛋存档")
 
     if args.git:
         commit_msg = args.subject or f"chore: 版本号升级到 v{ver}"

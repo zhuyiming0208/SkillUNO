@@ -9,6 +9,19 @@
 
 ---
 
+## [v1.22.0] - 2026-11-13
+
+Textual 阶段3 - 全屏鼠标点击出牌与结构化动作
+
+- 新增结构化 Action 协议（PlayCardAction / DrawCardAction / QuitGameAction）
+- core.py 的 choose_play 支持 Action 分流，ConsoleUI 返回 None 走原流程零破坏
+- TextualUI 渲染手牌按钮，可点击出牌，不可出的牌置灰
+- TUI 底部增加抽牌按钮与退出按钮
+- 修复输入框焦点问题，用 set_focus 替代 focus
+- pyproject.toml 加 package-data，彩蛋 archive.txt 进 wheel
+
+---
+
 ## [v1.21.0] - 2026-11-07
 
 Textual 阶段 2 - 全屏 GameScreen 与单向通信

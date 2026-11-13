@@ -17,6 +17,7 @@ if TEXTUAL_AVAILABLE:
 
 
     from uno.ui import ConsoleUI
+    from uno.ui.actions import PlayCardAction, DrawCardAction, QuitGameAction
 
     class TextualUI(ConsoleUI):
         """纯 TUI 适配器，通过 Input 控件和 Event 实现跨线程输入。"""
@@ -58,6 +59,16 @@ if TEXTUAL_AVAILABLE:
         def pause(self, message=""):
             return self.input(message)
 
+        def choose_action(self, player, game, top_card, current_color):
+            """TUI 结构化动作：渲染按钮并等待点击。"""
+            self.app.call_from_thread(
+                self.game_screen.show_choose_buttons, player, top_card, current_color
+            )
+            self._input_event.clear()
+            self._input_event.wait()
+            self.app.call_from_thread(self.game_screen.clear_choose_buttons)
+            return self._input_result
+
 
     class GameScreen(Screen):
         """全屏游戏界面。"""
@@ -70,11 +81,13 @@ if TEXTUAL_AVAILABLE:
         def compose(self) -> ComposeResult:
             yield Header(show_clock=False, icon="")
             yield RichLog(id="game-log", highlight=True, markup=True)
+            yield Container(id="card-bar")
             yield Input(placeholder="等待游戏开始...", id="game-input")
             yield Footer(show_command_palette=False)
 
         def on_mount(self) -> None:
             self.query_one("#game-input").display = False
+            self.query_one("#card-bar").display = False
             if not self.test_mode:
                 self.run_worker(self.run_game, thread=True)
 
@@ -83,6 +96,53 @@ if TEXTUAL_AVAILABLE:
 
         def clear_log(self):
             self.query_one("#game-log", RichLog).clear()
+
+        def show_choose_buttons(self, player, top_card, current_color):
+            """UI 线程：渲染手牌按钮 + 抽牌按钮。"""
+            bar = self.query_one("#card-bar", Container)
+            bar.remove_children()
+            for i, card in enumerate(player.hand):
+                playable = card.is_playable_on(top_card, current_color)
+                btn = Button(
+                    f"[{i}] {card}",
+                    id=f"card_{i}",
+                    variant="primary" if playable else "default",
+                    disabled=not playable,
+                )
+                bar.mount(btn)
+            bar.mount(Button("抽牌", id="draw_btn", variant="warning"))
+            bar.mount(Button("退出", id="quit_btn", variant="error"))
+            # 隐藏文本输入框，避免同时出现两套交互
+            self.query_one("#game-input").display = False
+            bar.display = True
+
+        def clear_choose_buttons(self):
+            """UI 线程：清空按钮区。"""
+            bar = self.query_one("#card-bar", Container)
+            bar.remove_children()
+            bar.display = False
+
+        def on_button_pressed(self, event: Button.Pressed) -> None:
+            """处理按钮点击，构造 Action 唤醒后台线程。"""
+            if self.textual_ui is None:
+                return
+            bid = event.button.id or ""
+            if bid.startswith("card_"):
+                try:
+                    idx = int(bid[5:])
+                except ValueError:
+                    return
+                self.textual_ui._input_result = PlayCardAction(card_index=idx)
+                self.textual_ui._input_event.set()
+                event.stop()
+            elif bid == "draw_btn":
+                self.textual_ui._input_result = DrawCardAction()
+                self.textual_ui._input_event.set()
+                event.stop()
+            elif bid == "quit_btn":
+                self.textual_ui._input_result = QuitGameAction()
+                self.textual_ui._input_event.set()
+                event.stop()
 
         def show_input(self, prompt: str):
             """UI 线程：显示输入框并聚焦。"""
@@ -99,7 +159,7 @@ if TEXTUAL_AVAILABLE:
             inp.placeholder = short_prompt
             inp.value = ""
             inp.display = True
-            inp.focus()
+            self.set_focus(inp)
 
         def on_input_submitted(self, event: Input.Submitted):
             """UI 线程：用户敲回车。"""
@@ -215,6 +275,21 @@ if TEXTUAL_AVAILABLE:
         Screen {
             background: #0d1117;
             align: center middle;
+        }
+        #card-bar {
+            height: auto;
+            max-height: 7;
+            padding: 1;
+            background: #161b22;
+            border-top: solid #30363d;
+            layout: horizontal;
+            overflow-x: auto;
+        }
+        #card-bar Button {
+            width: auto;
+            min-width: 10;
+            margin-right: 1;
+            height: 3;
         }
         #menu-card {
             width: 90%;

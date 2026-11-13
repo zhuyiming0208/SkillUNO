@@ -275,6 +275,15 @@ class Player:
     def choose_play(self, top_card: Card, current_color: str, game: 'UNOGame') -> Optional[int]:
         self.game = game
         if self.is_human:
+            action = self.ui.choose_action(self, game, top_card, current_color)
+            if action is not None:
+                from .ui.actions import PlayCardAction, DrawCardAction, QuitGameAction
+                if isinstance(action, PlayCardAction):
+                    return action.card_index
+                if isinstance(action, DrawCardAction):
+                    return None
+                if isinstance(action, QuitGameAction):
+                    raise SystemExit
             return self.human_choose(top_card, current_color)
         else:
             return self.ai_choose(top_card, current_color)

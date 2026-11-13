@@ -1,6 +1,6 @@
 [project]
 name = "skilluno"
-version = "1.21.0"
+version = "1.22.0"
 description = "一个基于 Python 的 UNO 卡牌游戏框架"
 readme = "README.md"
 requires-python = ">=3.8"
@@ -20,6 +20,9 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+uno = ["archive.txt"]
 
 [tool.coverage.run]
 omit = [

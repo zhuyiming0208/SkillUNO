@@ -4,7 +4,7 @@ from uno.replay import GameRecorder, GameReplayer
 from uno.ui import ConsoleUI
 from uno.paths import find_mods_dir
 
-VERSION = "v1.21.0"
+VERSION = "v1.22.0"
 
 def _make_ai(level: str):
     """按难度返回 AI 策略实例。level: '1'/'2'/'3'。"""

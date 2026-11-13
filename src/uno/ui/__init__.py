@@ -10,6 +10,14 @@ except ImportError:
 
 class ConsoleUI:
     """默认命令行 UI，用于解耦输入输出"""
+    def choose_action(self, player, game, top_card, current_color):
+        """结构化动作入口。
+
+        返回 None 表示「不支持结构化动作」，调用方走原有 human_choose 流程。
+        ConsoleUI / RichUI / NullUI 均返回 None，CLI 行为零变化。
+        """
+        return None
+
     def show(self, text=""):
         print(text)
 

@@ -1158,5 +1158,7 @@ UNO 提醒、对手手牌数显示、帮助引导
 [v1.14.0]: https://github.com/zhuyiming0208/SkillUNO/compare/v1.13.0...v1.14.0
 [v1.13.0]: https://github.com/zhuyiming0208/SkillUNO/compare/v1.12.2...v1.13.0
 [v1.12.2]: https://github.com/zhuyiming0208/SkillUNO/compare/v1.12.1...v1.12.2
+[v1.12.1]: https://github.com/zhuyiming0208/SkillUNO/compare/v1.12.0...v1.12.1
+[v1.12.0]: https://github.com/zhuyiming0208/SkillUNO/compare/v1.11.0...v1.12.0
 
 `再之前的就没有保存了……`

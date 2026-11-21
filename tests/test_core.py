@@ -67,10 +67,17 @@ def other_player(mock_game):
 
 @pytest.fixture
 def human_player(mock_game):
-    """显式需要人类分支时使用，自动 mock input。"""
+    """显式需要人类分支时使用。
+
+    注意：
+    - 强制 choose_action 返回 None，让 choose_play 走 human_choose 真实路径，
+      避免 MagicMock 返回 MagicMock 导致假绿（human_choose 从未被调用）。
+    - 不设默认 input，需要输入的场景由测试自行 Mock(input=side_effect=[...])，
+      避免单值 return_value 在重试循环里死循环。
+    """
     p = mock_game.players[0]
     p.is_human = True
-    p.ui.input = MagicMock(return_value='0')
+    p.ui.choose_action = MagicMock(return_value=None)
     return p
 
 
@@ -234,6 +241,7 @@ class TestSkillManager:
 
         skill = InterceptSkill('拦截', SkillType.ACTIVE, 'desc', owner=human_player)
         human_player.skills = [skill]
+        human_player.ui.input = MagicMock(return_value='0')  # 选第 0 个技能
         result = mock_game.skill_manager.ask_human_intercept(
             human_player, GameEvent.BEING_ADDED_CARDS,
             {'target': human_player, 'amount': 2}
@@ -3368,3 +3376,123 @@ class TestHybridSkill:
         assert skill.passive_calls == 1
         assert skill.is_consumed is False
 
+class TestHumanChoose:
+    """human_choose 真实交互路径测试（走 ui.input，不走 choose_action）。"""
+
+    def _setup(self, player, game, responses):
+        """初始化 human_choose 的测试前置：可出手牌 + 顺序输入。"""
+        player.game = game
+        player.hand = [Card('红', '数字', 1), Card('红', '数字', 2)]
+        player.ui.input = MagicMock(side_effect=responses)
+        # 顶牌红色 5，手里红 1 / 红 2 都可出（同色）
+        return Card('红', '数字', 5), '红'
+
+    def test_play_valid_card(self, human_player, mock_game):
+        """输入有效牌序号 0，返回 0。"""
+        top, color = self._setup(human_player, mock_game, ['0'])
+        result = human_player.human_choose(top, color)
+        assert result == 0
+
+    def test_retry_on_invalid_input(self, human_player, mock_game):
+        """非法输入（abc / 99）后重试，最终输入 1 返回 1。"""
+        top, color = self._setup(human_player, mock_game, ['abc', '99', '1'])
+        result = human_player.human_choose(top, color)
+        assert result == 1
+
+    def test_draw_returns_none(self, human_player, mock_game):
+        """空回车抽牌，返回 None（抽牌动作由 play_turn 处理）。"""
+        top, color = self._setup(human_player, mock_game, [''])
+        result = human_player.human_choose(top, color)
+        assert result is None
+
+    def test_quit_raises_system_exit(self, human_player, mock_game):
+        """输入 q 触发 SystemExit（site.Quitter）。"""
+        top, color = self._setup(human_player, mock_game, ['q'])
+        with pytest.raises(SystemExit):
+            human_player.human_choose(top, color)
+
+    def test_help_then_play(self, human_player, mock_game):
+        """输入 h 显示帮助后继续循环，再输入 0 出牌返回 0。"""
+        top, color = self._setup(human_player, mock_game, ['h', '0'])
+        result = human_player.human_choose(top, color)
+        assert result == 0
+    def test_hotseat_pause_and_clear(self, human_player, mock_game):
+        """热座模式：进入 human_choose 前 pause + clear_screen。"""
+        mock_game.hotseat = True
+        human_player.ui.pause = MagicMock()
+        human_player.ui.clear_screen = MagicMock()
+        top, color = self._setup(human_player, mock_game, ['0'])
+        result = human_player.human_choose(top, color)
+        assert result == 0
+        human_player.ui.pause.assert_called_once()
+        human_player.ui.clear_screen.assert_called_once()
+
+    def test_rich_ui_branch(self, human_player, mock_game):
+        """RichUI 分支：走 show_turn_header / show_card 等富接口。"""
+        from uno.ui import RichUI
+        rich_ui = RichUI.__new__(RichUI)
+        for name in ('show_turn_header', 'print_inline', 'show_card',
+                     'show', 'show_hand', 'show_skill'):
+            setattr(rich_ui, name, MagicMock())
+        rich_ui.input = MagicMock(side_effect=['0'])
+        human_player.ui = rich_ui
+        human_player.game = mock_game
+        human_player.hand = [Card('红', '数字', 1)]
+        result = human_player.human_choose(Card('红', '数字', 5), '红')
+        assert result == 0
+        rich_ui.show_turn_header.assert_called_once()
+        rich_ui.show_hand.assert_called_once()
+
+    def test_help_skill_found(self, human_player, mock_game):
+        """help 技能名：从 player.skills 找到技能并显示详情。"""
+        from uno.core import Skill, SkillType
+        skill = Skill('测试技能', SkillType.ACTIVE, '简介',
+                      help_text='详细说明', owner=human_player, game=mock_game)
+        human_player.skills = [skill]
+        top, color = self._setup(human_player, mock_game, ['help 测试技能', '0'])
+        result = human_player.human_choose(top, color)
+        assert result == 0
+
+    def test_help_skill_not_found(self, human_player, mock_game):
+        """help 技能名：skills 和 glossary 都没有，提示未找到。"""
+        human_player.skills = []
+        mock_game.skill_glossary = {}
+        top, color = self._setup(human_player, mock_game, ['help 不存在', '0'])
+        result = human_player.human_choose(top, color)
+        assert result == 0
+
+    def test_help_from_glossary(self, human_player, mock_game):
+        """help 技能名：skills 里没，但 glossary 有简介。"""
+        human_player.skills = []
+        mock_game.skill_glossary = {'某技能': '简介描述'}
+        top, color = self._setup(human_player, mock_game, ['help 某技能', '0'])
+        result = human_player.human_choose(top, color)
+        assert result == 0
+
+    def test_skill_activate_then_play(self, human_player, mock_game):
+        """s 技能分支：选中可用技能执行，然后出牌。"""
+        from uno.core import Skill, SkillType
+        skill = Skill('可发动', SkillType.ACTIVE, '简介',
+                      owner=human_player, game=mock_game)
+        skill.can_trigger = MagicMock(return_value=True)
+        human_player.skills = [skill]
+        mock_game.skill_manager.execute_skill = MagicMock()
+        top, color = self._setup(human_player, mock_game, ['s', '0', '0'])
+        result = human_player.human_choose(top, color)
+        assert result == 0
+        mock_game.skill_manager.execute_skill.assert_called_once()
+
+    def test_skill_no_available(self, human_player, mock_game):
+        """s 技能分支：无可用技能，提示后继续循环。"""
+        human_player.skills = []
+        top, color = self._setup(human_player, mock_game, ['s', '0'])
+        result = human_player.human_choose(top, color)
+        assert result == 0
+
+    def test_unplayable_card_retry(self, human_player, mock_game):
+        """不可出牌重试：输入不可出牌后继续，再输入可出牌返回。"""
+        human_player.game = mock_game
+        human_player.hand = [Card('蓝', '数字', 1), Card('红', '数字', 2)]
+        human_player.ui.input = MagicMock(side_effect=['0', '1'])
+        result = human_player.human_choose(Card('红', '数字', 5), '红')
+        assert result == 1

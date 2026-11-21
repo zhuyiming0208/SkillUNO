@@ -22,6 +22,7 @@ jobs:
           python-version: '3.11'
 
       - name: Run discovery
+        id: discovery
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: python tools/discover_mods.py
@@ -31,6 +32,7 @@ jobs:
         run: echo "today=$(date -u +%Y-%m-%d)" >> $GITHUB_OUTPUT
 
       - name: Create Pull Request
+        id: cpr
         uses: peter-evans/create-pull-request@v6
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -44,3 +46,21 @@ jobs:
           delete-branch: true
           add-paths: |
             mods/
+
+      - name: Auto-merge if only date changed
+        if: steps.discovery.outputs.only_date == 'true' && steps.cpr.outputs.pull-request-number != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "仅 update_time 变化，自动合并 PR #${{ steps.cpr.outputs.pull-request-number }}"
+          # create-pull-request 创建后到 GitHub 可见有延迟，重试几次
+          for i in 1 2 3 4 5; do
+            if gh pr merge ${{ steps.cpr.outputs.pull-request-number }} --squash --admin --delete-branch 2>&1; then
+              echo "✅ 自动合并成功"
+              exit 0
+            fi
+            echo "第 $i 次尝试失败，5 秒后重试..."
+            sleep 5
+          done
+          echo "❌ 5 次重试后仍失败，需人工处理"
+          exit 1

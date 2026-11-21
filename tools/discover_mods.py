@@ -226,7 +226,20 @@ def main():
         "other": new_other,
         "update_time": time.strftime("%Y-%m-%d", time.gmtime()),
     }
+
+    # 检测是否只有 update_time 变化（用于 workflow 自动合并决策）
+    only_date = (
+        old_index.get("handpicked") == new_index["handpicked"]
+        and old_index.get("other") == new_index["other"]
+        and old_index.get("version") == new_index["version"]
+    )
     _save_atomic(idx_path, new_index)
+
+    # 写入 GITHUB_OUTPUT（本地跑时环境变量不存在，跳过）
+    gh_out = os.environ.get("GITHUB_OUTPUT")
+    if gh_out:
+        with open(gh_out, "a", encoding="utf-8") as f:
+            f.write(f"only_date={'true' if only_date else 'false'}\n")
 
     # 摘要
     print()
